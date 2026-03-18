@@ -1,0 +1,77 @@
+/* smarts.bio JupyterLab extension base styles */
+
+/* CSS variable bridge: map --vscode-* variables to --jp-* equivalents.
+   This lets all React components copied from the VS Code extension work
+   without any style changes. Applied at the smarts-bio panel root. */
+.smarts-bio-panel {
+  --vscode-foreground: var(--jp-ui-font-color1);
+  --vscode-background: var(--jp-layout-color1);
+  --vscode-sideBar-background: var(--jp-layout-color2);
+  --vscode-editor-background: var(--jp-cell-editor-background, var(--jp-layout-color1));
+  --vscode-panel-border: var(--jp-border-color1);
+  --vscode-button-background: var(--jp-brand-color1);
+  --vscode-button-foreground: var(--jp-ui-inverse-font-color1, #fff);
+  --vscode-button-hoverBackground: var(--jp-brand-color0);
+  --vscode-button-secondaryBackground: var(--jp-layout-color3);
+  --vscode-button-secondaryForeground: var(--jp-ui-font-color1);
+  --vscode-button-secondaryHoverBackground: var(--jp-layout-color4);
+  --vscode-input-background: var(--jp-cell-editor-background, var(--jp-layout-color2));
+  --vscode-input-foreground: var(--jp-ui-font-color1);
+  --vscode-input-border: var(--jp-border-color1);
+  --vscode-descriptionForeground: var(--jp-ui-font-color2);
+  --vscode-textLink-foreground: var(--jp-content-link-color, var(--jp-brand-color1));
+  --vscode-textCodeBlock-background: var(--jp-cell-editor-background, var(--jp-layout-color2));
+  --vscode-progressBar-background: var(--jp-brand-color1);
+  --vscode-font-family: var(--jp-ui-font-family);
+  --vscode-font-size: var(--jp-ui-font-size1);
+  --vscode-editor-font-family: var(--jp-code-font-family);
+  --vscode-errorForeground: var(--jp-error-color1, #f85149);
+  --vscode-focusBorder: var(--jp-brand-color1);
+  --vscode-widget-border: var(--jp-border-color1);
+  --vscode-editorWidget-background: var(--jp-layout-color2);
+  --vscode-editorWidget-border: var(--jp-border-color1);
+  --vscode-list-activeSelectionBackground: var(--jp-brand-color1);
+  --vscode-list-activeSelectionForeground: var(--jp-ui-inverse-font-color1, #fff);
+  --vscode-toolbar-hoverBackground: var(--jp-layout-color3);
+  --vscode-inputValidation-errorBackground: rgba(248, 81, 73, 0.15);
+
+  font-family: var(--jp-ui-font-family);
+  font-size: var(--jp-ui-font-size1);
+  color: var(--jp-ui-font-color1);
+  background: var(--jp-layout-color1);
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Markdown styles for assistant messages */
+.smarts-bio-panel .md p { margin: 0.4em 0; line-height: 1.5; font-size: 13px; }
+.smarts-bio-panel .md ul, .smarts-bio-panel .md ol { padding-left: 1.4em; margin: 0.3em 0; }
+.smarts-bio-panel .md li { margin: 0.1em 0; font-size: 13px; }
+.smarts-bio-panel .md h1, .smarts-bio-panel .md h2, .smarts-bio-panel .md h3 { margin: 0.5em 0 0.3em; line-height: 1.3; }
+.smarts-bio-panel .md code { font-family: var(--jp-code-font-family); font-size: 12px; background: var(--jp-cell-editor-background); padding: 0 3px; border-radius: 3px; }
+.smarts-bio-panel .md a { color: var(--jp-content-link-color, var(--jp-brand-color1)); }
+.smarts-bio-panel .md table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.smarts-bio-panel .md th, .smarts-bio-panel .md td { padding: 4px 8px; border: 1px solid var(--jp-border-color1); text-align: left; }
+.smarts-bio-panel .md th { background: var(--jp-layout-color2); font-weight: 600; }
+.smarts-bio-panel .md blockquote { border-left: 3px solid var(--jp-border-color1); margin: 0.4em 0; padding: 0 0.6em; opacity: 0.8; }
+
+/* Entity links in assistant messages */
+.smarts-bio-panel .entity-link {
+  color: var(--jp-content-link-color, var(--jp-brand-color1));
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+/* Animated cursor for streaming messages */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* smarts.bio logo */
+.smarts-bio-panel .sb-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}

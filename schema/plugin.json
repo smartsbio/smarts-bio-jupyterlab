@@ -1,0 +1,46 @@
+{
+  "title": "smarts.bio",
+  "description": "smarts.bio JupyterLab extension settings",
+  "jupyter.lab.setting-icon-label": "smarts.bio",
+  "type": "object",
+  "properties": {
+    "apiBaseUrl": {
+      "title": "API Base URL",
+      "description": "Base URL for the smarts.bio API",
+      "type": "string",
+      "default": "https://api.smarts.bio"
+    },
+    "websiteBaseUrl": {
+      "title": "Website Base URL",
+      "description": "Base URL for the smarts.bio website (used for OAuth sign-in)",
+      "type": "string",
+      "default": "https://chat.smarts.bio"
+    },
+    "defaultWorkspaceId": {
+      "title": "Default Workspace ID",
+      "description": "Default workspace ID (auto-populated after sign-in)",
+      "type": "string",
+      "default": ""
+    },
+    "sendOnEnter": {
+      "title": "Send on Enter",
+      "description": "Send chat messages when pressing Enter (use Shift+Enter for newline)",
+      "type": "boolean",
+      "default": true
+    },
+    "enableKernelContext": {
+      "title": "Enable Kernel Context",
+      "description": "Include kernel variable names as context when sending queries",
+      "type": "boolean",
+      "default": true
+    },
+    "pollingIntervalMs": {
+      "title": "Polling Interval (ms)",
+      "description": "How often to poll for process status updates in the Processes panel",
+      "type": "number",
+      "default": 15000,
+      "minimum": 5000
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-jupyter-builder>=0.5"]
+build-backend = "hatchling.build"
+
+[project]
+name = "smartsbio-jupyterlab"
+dynamic = ["version"]
+description = "smarts.bio bioinformatics AI agent — JupyterLab extension"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+keywords = ["JupyterLab", "bioinformatics", "AI", "smarts.bio"]
+classifiers = [
+    "Framework :: Jupyter",
+    "Framework :: Jupyter :: JupyterLab",
+    "Framework :: Jupyter :: JupyterLab :: 4",
+    "Framework :: Jupyter :: JupyterLab :: Extensions",
+    "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+dependencies = ["jupyter_server>=2.0.1,<3"]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio", "jupyter_server[test]>=2.0.1,<3"]
+
+[project.urls]
+Homepage = "https://smarts.bio"
+Repository = "https://github.com/smartsbio/smarts-bio-jupyterlab"
+
+[tool.hatch.version]
+source = "code"
+path = "smarts_bio_jupyterlab/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["smarts_bio_jupyterlab"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"smarts_bio_jupyterlab/labextension" = "share/jupyter/labextensions/@smartsbio/jupyterlab-extension"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["smarts_bio_jupyterlab/labextension"]
+exclude = [".yarn", "node_modules"]
+
+[tool.hatch.build.hooks.jupyter-builder]
+dependencies = ["hatch-jupyter-builder>=0.5"]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = [
+    "smarts_bio_jupyterlab/labextension/static/style.js",
+    "smarts_bio_jupyterlab/labextension/package.json",
+]
+skip-if-exists = ["smarts_bio_jupyterlab/labextension/static/style.js"]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+build_cmd = "build:prod"
+npm = ["jlpm"]
+
+[tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
+build_cmd = "install:extension"
+npm = ["jlpm"]
+source_dir = "src"
+build_dir = "smarts_bio_jupyterlab/labextension"
+
+[tool.jupyter-releaser.options]
+version-cmd = "hatch version"
+
+[tool.jupyter-releaser.hooks]
+before-bump-version = ["python -m pip install hatch", "jlpm"]
+before-release-tag = ["python -m pip install hatch", "jlpm run build:prod"]

@@ -1,0 +1,46 @@
+# Build outputs
+lib/
+dist/
+*.js.map
+*.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.env
+
+# JupyterLab extension build artifacts
+smarts_bio_jupyterlab/labextension/
+install.json
+
+# Node
+node_modules/
+.yarn/
+.pnp.*
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+.virtual_documents/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+*.log
+.cache/
