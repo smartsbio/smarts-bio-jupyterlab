@@ -92,7 +92,8 @@
   "jupyterlab": {
     "extension": true,
     "outputDir": "smarts_bio_jupyterlab/labextension",
-    "schemaDir": "schema"
+    "schemaDir": "schema",
+    "icon": "https://smarts-public.s3.us-east-1.amazonaws.com/logo_120x120.png"
   },
   "jupyter-releaser": {
     "hooks": {
