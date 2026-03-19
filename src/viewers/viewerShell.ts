@@ -5,8 +5,7 @@
 export const CDN = {
   MOLSTAR_JS: 'https://cdn.jsdelivr.net/npm/molstar@5.1.2/build/viewer/molstar.js',
   MOLSTAR_CSS: 'https://cdn.jsdelivr.net/npm/molstar@5.1.2/build/viewer/molstar.css',
-  IGV_JS: 'https://cdn.jsdelivr.net/npm/igv@3.0.5/dist/igv.min.js',
-  PAPAPARSE_JS: 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js',
+PAPAPARSE_JS: 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js',
   PAKO_JS: 'https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js',
 };
 
