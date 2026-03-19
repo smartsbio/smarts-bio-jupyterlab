@@ -50,8 +50,6 @@ smarts.bio is built for Jupyter workflows:
 - **Analyze active cell** — right-click any cell or use the toolbar button to send it to the agent as context
 - **Attach kernel variables** — share the current state of your kernel with the agent so it understands your data
 
-![Insert code as a new notebook cell](https://smarts-public.s3.us-east-1.amazonaws.com/jupyterlab/screenshot-insert-cell.png)
-
 ---
 
 ### 3D structure viewer
@@ -129,7 +127,7 @@ jupyter lab
 
 Click the **smarts.bio** icon in the left sidebar → **Sign In**. A popup window opens, you authenticate, and JupyterLab resumes automatically.
 
-No account? [Register free at smarts.bio](https://smarts.bio/register) — includes compute credits to try GPU pipelines.
+No account? [Get started at chat.smarts.bio](https://chat.smarts.bio) — includes compute credits to try GPU pipelines.
 
 ### 3. Ask something
 
@@ -145,7 +143,7 @@ Give me 3 candidates ranked by pLDDT score.
 
 - JupyterLab 4.x
 - Python 3.8 or later
-- A smarts.bio account ([free registration](https://smarts.bio/register))
+- A smarts.bio account ([get started at chat.smarts.bio](https://chat.smarts.bio))
 - Internet connection (GPU pipelines and AI run on smarts.bio cloud infrastructure)
 
 ---
