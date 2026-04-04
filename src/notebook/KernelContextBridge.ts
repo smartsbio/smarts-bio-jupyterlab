@@ -2,7 +2,7 @@
 // for variable names/types/previews and returns them as a ContextAttachment.
 import { INotebookTracker } from '@jupyterlab/notebook';
 import { KernelMessage } from '@jupyterlab/services';
-import type { ContextAttachment } from '../chat/types';
+import type { ContextAttachment } from '@smartsbio/ui';
 
 /** Snippet executed in the kernel to introspect variables. */
 const INSPECT_SNIPPET = `

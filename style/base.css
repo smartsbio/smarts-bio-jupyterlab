@@ -1,9 +1,48 @@
 /* smarts.bio JupyterLab extension base styles */
 
-/* CSS variable bridge: map --vscode-* variables to --jp-* equivalents.
-   This lets all React components copied from the VS Code extension work
-   without any style changes. Applied at the smarts-bio panel root. */
+/* CSS variable bridge: map --sb-* (smarts-bio-ui design tokens) and legacy
+   --vscode-* variables to --jp-* equivalents. Applies to every widget that
+   carries the .smarts-bio-panel class (chat, explorer, viewers). */
 .smarts-bio-panel {
+  /* ── smarts-bio-ui --sb-* tokens ─────────────────────────────────────── */
+  --sb-foreground:           var(--jp-ui-font-color1);
+  --sb-foreground-muted:     var(--jp-ui-font-color2);
+  --sb-link:                 var(--jp-content-link-color, var(--jp-brand-color1));
+  --sb-error:                var(--jp-error-color1, #f85149);
+  --sb-error-bg:             rgba(248, 81, 73, 0.12);
+
+  --sb-background:           var(--jp-layout-color1);
+  --sb-sidebar-background:   var(--jp-layout-color2);
+  --sb-editor-background:    var(--jp-cell-editor-background, var(--jp-layout-color1));
+  --sb-widget-background:    var(--jp-layout-color2);
+  --sb-input-background:     var(--jp-cell-editor-background, var(--jp-layout-color2));
+  --sb-code-background:      var(--jp-cell-editor-background, var(--jp-layout-color2));
+  --sb-selection-background: var(--jp-brand-color1);
+  --sb-hover-background:     var(--jp-layout-color3);
+
+  --sb-border:               var(--jp-border-color1);
+  --sb-table-grid:           var(--jp-border-color2);
+  --sb-widget-border:        var(--jp-border-color1);
+  --sb-tab-border:           var(--jp-border-color1);
+  --sb-input-border:         var(--jp-border-color1);
+  --sb-focus-border:         var(--jp-brand-color1);
+
+  --sb-input-foreground:     var(--jp-ui-font-color1);
+
+  --sb-button-bg:            var(--jp-brand-color1);
+  --sb-button-fg:            var(--jp-ui-inverse-font-color1, #fff);
+  --sb-button-hover-bg:      var(--jp-brand-color0);
+  --sb-button-secondary-bg:  var(--jp-layout-color3);
+  --sb-button-secondary-fg:  var(--jp-ui-font-color1);
+  --sb-button-secondary-hover-bg: var(--jp-layout-color4);
+
+  --sb-progress:             var(--jp-brand-color1);
+
+  --sb-font-family:          var(--jp-ui-font-family);
+  --sb-font-size:            var(--jp-ui-font-size1);
+  --sb-mono-family:          var(--jp-code-font-family);
+
+  /* ── Legacy --vscode-* bridge (kept for backwards compat) ───────────── */
   --vscode-foreground: var(--jp-ui-font-color1);
   --vscode-background: var(--jp-layout-color1);
   --vscode-sideBar-background: var(--jp-layout-color2);

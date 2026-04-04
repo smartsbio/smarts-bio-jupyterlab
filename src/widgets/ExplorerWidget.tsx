@@ -1,79 +1,54 @@
 // Combined sidebar widget with Files and Processes tabs.
-// Replaces the separate FilesWidget and ProcessesWidget in the left sidebar.
+// Uses FilesPanel + ProcessesPanel from @smartsbio/ui via SmartsBioProvider context.
 import React from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
+import { SmartsBioProvider, FilesPanel, ProcessesPanel } from '@smartsbio/ui';
+import type { SmartsBioCapabilities, UserProfile } from '@smartsbio/ui';
 import { AuthProvider } from '../auth/AuthProvider';
-import { SmartsBioClient } from '../api/SmartsBioClient';
 import { WorkspaceSelector } from '../workspace/WorkspaceSelector';
-import { FilesPanel } from '../panels/FilesPanel';
-import { ProcessesPanel } from '../panels/ProcessesPanel';
 
 type Tab = 'files' | 'processes';
 
 interface PanelProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
-  isAuthenticated: boolean;
+  capabilities: SmartsBioCapabilities;
   workspaceId: string;
-  client: SmartsBioClient;
-  workspaceSelector: WorkspaceSelector;
-  onOpenViewer: (fileKey: string, fileName: string, ext: string) => void;
-  onAnalyzeFile: (fileKey: string, fileName: string) => void;
+  profile: UserProfile | null;
   refreshToken: number;
-  onSignIn: () => void;
 }
 
-function ExplorerPanel({
+function ExplorerInner({
   activeTab,
   onTabChange,
-  isAuthenticated,
+  capabilities,
   workspaceId,
-  client,
-  workspaceSelector,
-  onOpenViewer,
-  onAnalyzeFile,
+  profile,
   refreshToken,
-  onSignIn,
 }: PanelProps): React.ReactElement {
   return (
-    <div style={styles.root}>
-      <div style={styles.tabBar}>
-        <button
-          style={{ ...styles.tab, ...(activeTab === 'files' ? styles.tabActive : {}) }}
-          onClick={() => onTabChange('files')}
-        >
-          Files
-        </button>
-        <button
-          style={{ ...styles.tab, ...(activeTab === 'processes' ? styles.tabActive : {}) }}
-          onClick={() => onTabChange('processes')}
-        >
-          Processes
-        </button>
+    <SmartsBioProvider value={{ capabilities, workspaceId, profile }}>
+      <div style={styles.root}>
+        <div style={styles.tabBar}>
+          <button
+            style={{ ...styles.tab, ...(activeTab === 'files' ? styles.tabActive : {}) }}
+            onClick={() => onTabChange('files')}
+          >
+            Files
+          </button>
+          <button
+            style={{ ...styles.tab, ...(activeTab === 'processes' ? styles.tabActive : {}) }}
+            onClick={() => onTabChange('processes')}
+          >
+            Processes
+          </button>
+        </div>
+        <div style={styles.panelBody}>
+          {activeTab === 'files' && <FilesPanel refreshToken={refreshToken} />}
+          {activeTab === 'processes' && <ProcessesPanel />}
+        </div>
       </div>
-      <div style={styles.panelBody}>
-        {activeTab === 'files' ? (
-          <FilesPanel
-            isAuthenticated={isAuthenticated}
-            workspaceId={workspaceId}
-            client={client}
-            workspaceSelector={workspaceSelector}
-            onOpenViewer={onOpenViewer}
-            onAnalyzeFile={onAnalyzeFile}
-            refreshToken={refreshToken}
-            onSignIn={onSignIn}
-          />
-        ) : (
-          <ProcessesPanel
-            isAuthenticated={isAuthenticated}
-            workspaceId={workspaceId}
-            client={client}
-            workspaceSelector={workspaceSelector}
-            onSignIn={onSignIn}
-          />
-        )}
-      </div>
-    </div>
+    </SmartsBioProvider>
   );
 }
 
@@ -85,7 +60,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tabBar: {
     display: 'flex',
-    borderBottom: '1px solid var(--vscode-panel-border)',
+    borderBottom: '1px solid var(--sb-border, var(--jp-border-color1))',
     flexShrink: 0,
   },
   tab: {
@@ -97,15 +72,15 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '11px',
     fontWeight: 600,
-    color: 'var(--vscode-descriptionForeground)',
+    color: 'var(--sb-foreground-muted, var(--jp-ui-font-color2))',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
-    fontFamily: 'var(--vscode-font-family)',
+    fontFamily: 'var(--jp-ui-font-family)',
     marginBottom: '-1px',
   },
   tabActive: {
-    color: 'var(--vscode-foreground)',
-    borderBottom: '2px solid var(--vscode-button-background)',
+    color: 'var(--sb-foreground, var(--jp-ui-font-color0))',
+    borderBottom: '2px solid var(--sb-accent, var(--jp-brand-color1))',
   },
   panelBody: {
     flex: 1,
@@ -121,10 +96,8 @@ export class ExplorerWidget extends ReactWidget {
 
   constructor(
     private readonly auth: AuthProvider,
-    private readonly client: SmartsBioClient,
     private readonly workspaceSelector: WorkspaceSelector,
-    private readonly onOpenViewer: (fileKey: string, fileName: string, ext: string) => void,
-    private readonly onAnalyzeFile: (fileKey: string, fileName: string) => void,
+    private readonly capabilities: SmartsBioCapabilities,
   ) {
     super();
     this.addClass('smarts-bio-panel');
@@ -149,17 +122,13 @@ export class ExplorerWidget extends ReactWidget {
 
   protected render(): React.ReactElement {
     return (
-      <ExplorerPanel
+      <ExplorerInner
         activeTab={this._activeTab}
         onTabChange={(tab) => { this._activeTab = tab; this.update(); }}
-        isAuthenticated={this.auth.isAuthenticated}
+        capabilities={this.capabilities}
         workspaceId={this.workspaceSelector.selectedWorkspaceId}
-        client={this.client}
-        workspaceSelector={this.workspaceSelector}
-        onOpenViewer={this.onOpenViewer}
-        onAnalyzeFile={this.onAnalyzeFile}
+        profile={this.auth.profile}
         refreshToken={this._refreshCounter}
-        onSignIn={() => this.auth.signIn()}
       />
     );
   }

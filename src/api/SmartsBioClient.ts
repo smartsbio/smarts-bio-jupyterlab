@@ -217,6 +217,76 @@ export class SmartsBioClient {
     yield { type: 'done' };
   }
 
+  /**
+   * Confirm a script plan and stream the generation result.
+   * Called after the user approves a script plan proposed by the agent.
+   */
+  async *streamConfirmScript(
+    threadId: string,
+    workspaceId: string,
+    sessionId: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<StreamChunk> {
+    const token = await this.auth.getToken();
+
+    const response = await fetch(`${this.getApiBase()}/v1/query/confirm-script`, {
+      method: 'POST',
+      signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({ thread_id: threadId, workspace_id: workspaceId, session_id: sessionId }),
+    });
+
+    if (response.status === 401) {
+      const refreshed = await this.auth.handleUnauthorized();
+      if (!refreshed) {
+        yield { type: 'error', error: 'Authentication required. Please sign in.' };
+        return;
+      }
+      yield* this.streamConfirmScript(threadId, workspaceId, sessionId, signal);
+      return;
+    }
+
+    if (!response.ok || !response.body) {
+      yield { type: 'error', error: `API error ${response.status}: ${response.statusText}` };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const chunk = parseSseLine(line);
+          if (chunk) {
+            yield chunk;
+            if (chunk.type === 'done' || chunk.type === 'error') return;
+          }
+        }
+      }
+    } catch (err: unknown) {
+      const name = err instanceof Error ? err.name : '';
+      if (name !== 'AbortError') throw err;
+      return;
+    } finally {
+      reader.cancel();
+    }
+
+    yield { type: 'done' };
+  }
+
   async stopQuery(conversationId: string): Promise<void> {
     try {
       await this.request('POST', '/v1/query/stop', { conversation_id: conversationId });
@@ -409,8 +479,19 @@ export class SmartsBioClient {
    * Pass asBase64=true for binary files (BAM, BCF) — returns base64-encoded data.
    */
   async getFileContent(fileKey: string, workspaceId: string, asBase64 = false): Promise<string> {
-    // Use the /v1/files/content proxy so the API gateway fetches from S3 server-side,
-    // avoiding S3 CORS restrictions on the browser origin (e.g. localhost:8888).
+    return this.getFileContentWithProgress(fileKey, workspaceId, asBase64, null);
+  }
+
+  /**
+   * Download file content with progress reporting.
+   * onProgress receives a value 0–100 as bytes arrive. Pass null to skip tracking.
+   */
+  async getFileContentWithProgress(
+    fileKey: string,
+    workspaceId: string,
+    asBase64: boolean,
+    onProgress: ((percent: number) => void) | null,
+  ): Promise<string> {
     const { apiBaseUrl } = this.getConfig();
     const token = await this.auth.getToken();
     const url = `${apiBaseUrl}/v1/files/content?workspace_id=${encodeURIComponent(workspaceId)}&key=${encodeURIComponent(fileKey)}`;
@@ -420,14 +501,52 @@ export class SmartsBioClient {
     if (!response.ok) {
       throw new Error(`Failed to fetch file: ${response.statusText}`);
     }
+
+    if (!onProgress || !response.body) {
+      // Fast path — no progress tracking needed
+      if (asBase64) {
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        bytes.forEach(b => (binary += String.fromCharCode(b)));
+        return btoa(binary);
+      }
+      return response.text();
+    }
+
+    // Stream with progress
+    const contentLength = response.headers.get('Content-Length');
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+
+    onProgress(0);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total > 0) {
+        onProgress(Math.min(99, Math.round((received / total) * 100)));
+      }
+    }
+    onProgress(100);
+
+    // Assemble all chunks
+    const allBytes = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      allBytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+
     if (asBase64) {
-      const buffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
       let binary = '';
-      bytes.forEach(b => (binary += String.fromCharCode(b)));
+      allBytes.forEach(b => (binary += String.fromCharCode(b)));
       return btoa(binary);
     }
-    return response.text();
+    return new TextDecoder().decode(allBytes);
   }
 
   async renameFolder(workspaceId: string, folderPath: string, newName: string): Promise<void> {

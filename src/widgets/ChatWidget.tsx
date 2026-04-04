@@ -1,20 +1,20 @@
 // NOTE: JupyterLab-specific — replaces the VS Code WebviewViewProvider pattern.
-// ChatWidget is a ReactWidget that renders <App> directly with prop callbacks.
+// ChatWidget is a ReactWidget that renders <ChatApp> from @smartsbio/ui directly.
 // No postMessage bridge needed — JupyterLab panels run in the same DOM.
 import React from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
+import { ChatApp, ChatAction } from '@smartsbio/ui';
+import type { ContextAttachment } from '@smartsbio/ui';
 import { AuthProvider } from '../auth/AuthProvider';
 import { SmartsBioClient } from '../api/SmartsBioClient';
 import { WorkspaceSelector } from '../workspace/WorkspaceSelector';
 import { CellInserter } from '../notebook/CellInserter';
-import { App, AppAction } from '../chat/App';
-import type { ContextAttachment } from '../chat/types';
 
 export class ChatWidget extends ReactWidget {
   private _conversationId: string = crypto.randomUUID();
   private _activeStream: AbortController | undefined;
   private _context: ContextAttachment | undefined;
-  private _dispatchRef = { current: null as React.Dispatch<AppAction> | null };
+  private _dispatchRef = { current: null as React.Dispatch<ChatAction> | null };
 
   constructor(
     private readonly auth: AuthProvider,
@@ -25,7 +25,7 @@ export class ChatWidget extends ReactWidget {
     super();
     this.addClass('smarts-bio-panel');
 
-    // Re-render on auth changes — dispatch into the reducer so App re-evaluates profile
+    // Re-render on auth changes so profile flows into ChatApp's initial prop
     auth.onAuthChange((profile) => {
       this._dispatchRef.current?.({ type: 'SET_PROFILE', profile });
       this.update();
@@ -48,18 +48,14 @@ export class ChatWidget extends ReactWidget {
 
   /** Programmatically send a message (called by analyze-cell / analyze-selection commands). */
   async sendMessage(text: string): Promise<void> {
-    await this._handleSend(text);
+    await this._handleSend(text, 'analysis');
   }
 
   private _getWorkspaceId(): string {
     return this.workspaceSelector.selectedWorkspaceId || this.auth.profile?.defaultWorkspaceId || '';
   }
 
-  private _getSendOnEnter(): boolean {
-    return true;
-  }
-
-  private async _handleSend(text: string): Promise<void> {
+  private async _handleSend(text: string, _mode: 'analysis' | 'script'): Promise<void> {
     if (!text.trim() || !this.auth.isAuthenticated) return;
 
     const workspaceId = this._getWorkspaceId();
@@ -83,19 +79,11 @@ export class ChatWidget extends ReactWidget {
         if (this._activeStream?.signal.aborted) break;
 
         if (chunk.type === 'text') {
-          this._dispatchRef.current?.({
-            type: 'STREAM_CHUNK',
-            messageId,
-            content: chunk.content ?? '',
-          });
+          this._dispatchRef.current?.({ type: 'STREAM_CHUNK', messageId, content: chunk.content ?? '' });
         } else if (chunk.type === 'tool_use') {
           this._dispatchRef.current?.({ type: 'TOOL_USE', toolName: chunk.toolName ?? '' });
         } else if (chunk.type === 'error') {
-          this._dispatchRef.current?.({
-            type: 'STREAM_ERROR',
-            messageId,
-            error: chunk.content ?? 'Unknown error',
-          });
+          this._dispatchRef.current?.({ type: 'STREAM_ERROR', messageId, error: chunk.content ?? 'Unknown error' });
           return;
         } else if (chunk.type === 'done') {
           break;
@@ -106,16 +94,60 @@ export class ChatWidget extends ReactWidget {
       this._context = undefined;
       this._dispatchRef.current?.({ type: 'SET_CONTEXT', context: null });
       this._dispatchRef.current?.({ type: 'STREAM_END', messageId });
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        // User stopped the stream — clear loading state
+    } catch (err: unknown) {
+      const name = err instanceof Error ? err.name : '';
+      const message = err instanceof Error ? err.message : String(err);
+      if (name === 'AbortError') {
         this._dispatchRef.current?.({ type: 'STREAM_END', messageId });
       } else {
-        this._dispatchRef.current?.({
-          type: 'STREAM_ERROR',
-          messageId,
-          error: err?.message ?? String(err),
-        });
+        this._dispatchRef.current?.({ type: 'STREAM_ERROR', messageId, error: message });
+      }
+    } finally {
+      this._activeStream = undefined;
+    }
+  }
+
+  private async _handleConfirmScript(threadId: string): Promise<void> {
+    const workspaceId = this._getWorkspaceId();
+    const messageId = crypto.randomUUID();
+    const sessionId = this._conversationId;
+
+    this._activeStream?.abort();
+    this._activeStream = new AbortController();
+
+    this._dispatchRef.current?.({ type: 'STREAM_START', messageId });
+
+    try {
+      const stream = this.client.streamConfirmScript(
+        threadId,
+        workspaceId,
+        sessionId,
+        this._activeStream.signal,
+      );
+
+      for await (const chunk of stream) {
+        if (this._activeStream?.signal.aborted) break;
+
+        if (chunk.type === 'text') {
+          this._dispatchRef.current?.({ type: 'STREAM_CHUNK', messageId, content: chunk.content ?? '' });
+        } else if (chunk.type === 'tool_use') {
+          this._dispatchRef.current?.({ type: 'TOOL_USE', toolName: chunk.toolName ?? '' });
+        } else if (chunk.type === 'error') {
+          this._dispatchRef.current?.({ type: 'STREAM_ERROR', messageId, error: chunk.error ?? 'Unknown error' });
+          return;
+        } else if (chunk.type === 'done') {
+          break;
+        }
+      }
+
+      this._dispatchRef.current?.({ type: 'STREAM_END', messageId });
+    } catch (err: unknown) {
+      const name = err instanceof Error ? err.name : '';
+      const message = err instanceof Error ? err.message : String(err);
+      if (name === 'AbortError') {
+        this._dispatchRef.current?.({ type: 'STREAM_END', messageId });
+      } else {
+        this._dispatchRef.current?.({ type: 'STREAM_ERROR', messageId, error: message });
       }
     } finally {
       this._activeStream = undefined;
@@ -162,37 +194,35 @@ export class ChatWidget extends ReactWidget {
   }
 
   protected render(): React.ReactElement {
-    const sendOnEnter = this._getSendOnEnter();
     return (
-      <App
+      <ChatApp
         profile={this.auth.profile}
-        sendOnEnter={sendOnEnter}
+        sendOnEnter={true}
         slashCatalog={null}
-        onSend={async (text) => {
-          await this._handleSend(text);
-          // Lazily load slash catalog after first send if not already loaded
-          if (!this._dispatchRef.current) return;
+        dispatchRef={this._dispatchRef}
+        onSend={async (text, mode) => {
+          await this._handleSend(text, mode);
           await this._handleFetchSlashCatalog();
         }}
         onStop={() => {
           this._activeStream?.abort();
           this._activeStream = undefined;
-          // Tell the agent to stop server-side (socket-close detection alone is unreliable through two proxy hops)
           if (this._conversationId) {
             void this.client.stopQuery(this._conversationId);
           }
         }}
         onNewChat={() => this.newConversation()}
-        onSignIn={() => this.auth.signIn()}
+        onSignIn={() => { void this.auth.signIn(); }}
         onSuggestion={async (text) => {
-          await this._handleSend(text);
+          await this._handleSend(text, 'analysis');
         }}
         onInsertCode={(code) => this.cellInserter.insertCode(code)}
         onClearContext={() => {
           this._context = undefined;
         }}
-        onFetchFiles={(path) => this._handleFetchFiles(path)}
-        dispatchRef={this._dispatchRef}
+        onFetchFiles={(path) => { void this._handleFetchFiles(path); }}
+        onConfirmScript={(threadId) => { void this._handleConfirmScript(threadId); }}
+        insertLabel="Insert ↓"
       />
     );
   }

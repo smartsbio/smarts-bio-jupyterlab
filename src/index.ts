@@ -15,6 +15,7 @@ import { SmartsBioClient } from './api/SmartsBioClient';
 import { WorkspaceSelector } from './workspace/WorkspaceSelector';
 import { ChatWidget } from './widgets/ChatWidget';
 import { ExplorerWidget } from './widgets/ExplorerWidget';
+import { createJupyterCapabilities } from './capabilities';
 import { CellInserter } from './notebook/CellInserter';
 import { CellContextProvider } from './notebook/CellContextProvider';
 import { KernelContextBridge } from './notebook/KernelContextBridge';
@@ -96,23 +97,22 @@ const plugin: JupyterFrontEndPlugin<void> = {
     chatWidget.title.icon = smartsBioIcon;
     chatWidget.title.caption = 'smarts.bio AI Chat';
 
-    const explorerWidget = new ExplorerWidget(
-      auth,
-      client,
-      workspaceSelector,
-      async (fileKey, fileName, ext) => {
+    const capabilities = createJupyterCapabilities(client, auth, cellInserter, {
+      openViewer: async (fileKey, fileName, ext) => {
         const widget = await openViewerWidget(
           fileKey, fileName, ext, client, workspaceSelector.selectedWorkspaceId,
         );
         app.shell.add(widget, 'main');
         app.shell.activateById(widget.id);
       },
-      (fileKey, fileName) => {
+      analyzeFile: (fileKey, fileName) => {
         chatWidget.attachContext({ type: 'selection', label: fileName, content: fileKey });
         app.shell.activateById(chatWidget.id);
-        app.commands.execute('smarts-bio:open-chat');
+        void app.commands.execute('smarts-bio:open-chat');
       },
-    );
+    });
+
+    const explorerWidget = new ExplorerWidget(auth, workspaceSelector, capabilities);
     explorerWidget.id = 'smarts-bio-explorer';
     explorerWidget.title.label = '';
     explorerWidget.title.icon = smartsBioIcon;

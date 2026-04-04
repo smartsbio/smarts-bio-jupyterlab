@@ -1,6 +1,6 @@
 // NOTE: JupyterLab-specific — provides active notebook cell content as context for chat.
 import { INotebookTracker } from '@jupyterlab/notebook';
-import type { ContextAttachment } from '../chat/types';
+import type { ContextAttachment } from '@smartsbio/ui';
 
 export class CellContextProvider {
   constructor(private readonly notebookTracker: INotebookTracker | null) {}
