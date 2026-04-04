@@ -26,19 +26,20 @@ jobs:
       - name: Install Python build tools
         run: pip install build twine hatch hatch-jupyter-builder
 
-      - name: Install JupyterLab (required for labextension build)
+      - name: Install JupyterLab (required for labextension build and jlpm)
         run: pip install "jupyterlab>=4.0.0,<5"
 
       - name: Install Node dependencies
-        # NPM_TOKEN is used by .npmrc to pull @smartsbio/ui from GitHub Packages
+        # NPM_TOKEN is used by .npmrc to pull @smartsbio/ui from GitHub Packages.
+        # jlpm is JupyterLab's bundled yarn; use it (not npm) to keep the yarn lockfile valid.
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm install
+        run: jlpm install
 
       - name: Build extension (TypeScript + JupyterLab bundle)
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm run build:prod
+        run: jlpm run build:prod
 
       - name: Build Python wheel and sdist
         run: python -m build

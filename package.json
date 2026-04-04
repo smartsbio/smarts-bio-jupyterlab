@@ -1,6 +1,6 @@
 {
   "name": "@smartsbio/jupyterlab-extension",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "smarts.bio AI-powered bioinformatics directly in JupyterLab",
   "keywords": [
     "jupyter",
@@ -54,7 +54,6 @@
     "watch:labextension": "jupyter labextension watch ."
   },
   "dependencies": {
-    "@smartsbio/ui": "^0.1.10",
     "@jupyterlab/application": "^4.0.0",
     "@jupyterlab/apputils": "^4.0.0",
     "@jupyterlab/cells": "^4.0.0",
@@ -67,6 +66,7 @@
     "@jupyterlab/statusbar": "^4.0.0",
     "@jupyterlab/ui-components": "^4.0.0",
     "@lumino/widgets": "^2.0.0",
+    "@smartsbio/ui": "^0.1.10",
     "marked": "^17.0.4",
     "react": "^18.2.0",
     "react-bootstrap-icons": "^1.11.6",

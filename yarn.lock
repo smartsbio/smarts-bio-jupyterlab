@@ -1592,6 +1592,7 @@ __metadata:
     "@jupyterlab/statusbar": ^4.0.0
     "@jupyterlab/ui-components": ^4.0.0
     "@lumino/widgets": ^2.0.0
+    "@smartsbio/ui": ^0.1.10
     "@types/react": ^18.2.0
     "@types/react-dom": ^18.2.0
     marked: ^17.0.4
@@ -1607,6 +1608,19 @@ __metadata:
     react-dom: ^18.2.0
   languageName: unknown
   linkType: soft
+
+"@smartsbio/ui@npm:^0.1.10":
+  version: 0.1.10
+  resolution: "@smartsbio/ui@npm:0.1.10::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40smartsbio%2Fui%2F0.1.10%2F6f422b77178c65cfea5aa55d905003366492ac6d"
+  dependencies:
+    marked: ^17.0.4
+    react-bootstrap-icons: ^1.11.4
+  peerDependencies:
+    react: ">=18.0.0"
+    react-dom: ">=18.0.0"
+  checksum: bdde20389253d47a0ec0772c63ea0790d11e657e5453aa3e7a3dac95e2fbd0cdf95b146a0b166dc863972848109f172b9efa61bc3bfb38f88dc5cf8b920bd581
+  languageName: node
+  linkType: hard
 
 "@tootallnate/once@npm:2":
   version: 2.0.0
@@ -5590,7 +5604,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-bootstrap-icons@npm:^1.11.6":
+"react-bootstrap-icons@npm:^1.11.4, react-bootstrap-icons@npm:^1.11.6":
   version: 1.11.6
   resolution: "react-bootstrap-icons@npm:1.11.6"
   dependencies:
