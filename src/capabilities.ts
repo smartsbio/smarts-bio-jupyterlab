@@ -5,10 +5,31 @@ import type { SmartsBioCapabilities, FileItem } from '@smartsbio/ui';
 import { SmartsBioClient } from './api/SmartsBioClient';
 import { AuthProvider } from './auth/AuthProvider';
 import { CellInserter } from './notebook/CellInserter';
+import { InputDialog, showDialog, Dialog } from '@jupyterlab/apputils';
+import { Widget } from '@lumino/widgets';
+
+/**
+ * Sentinel returned by the overridden window.prompt().
+ * FilesPanel calls prompt() synchronously; we intercept this value
+ * in renameFile/createFolder to show JupyterLab's async InputDialog instead.
+ */
+export const PROMPT_SENTINEL = '\x00jlab_prompt_pending';
+
+/**
+ * Override window.prompt to return a sentinel so FilesPanel's rename/create-folder
+ * flows delegate to JupyterLab's native InputDialog (which is async-friendly).
+ * Call this once before mounting the FilesPanel widget.
+ */
+export function overrideWindowPrompt(): void {
+  (window as any).prompt = (_message?: string, _defaultValue?: string): string => {
+    return PROMPT_SENTINEL;
+  };
+}
 
 export interface JupyterCallbacks {
   openViewer(fileKey: string, fileName: string, ext: string): void;
   analyzeFile(fileKey: string, fileName: string): void;
+  refreshFiles(): void;
 }
 
 export function createJupyterCapabilities(
@@ -109,15 +130,31 @@ export function createJupyterCapabilities(
     },
 
     createFolder: async (workspaceId, folderPath) => {
-      const lastSlash = folderPath.lastIndexOf('/');
-      const name = lastSlash >= 0 ? folderPath.slice(lastSlash + 1) : folderPath;
-      const parentPath = lastSlash >= 0 ? folderPath.slice(0, lastSlash) : undefined;
+      let resolvedPath = folderPath;
+      if (folderPath.endsWith(PROMPT_SENTINEL)) {
+        const parentPath = folderPath.slice(0, -PROMPT_SENTINEL.length).replace(/\/$/, '');
+        const result = await InputDialog.getText({ title: 'New Folder', label: 'Folder name' });
+        if (!result.button.accept || !result.value?.trim()) return;
+        resolvedPath = parentPath ? `${parentPath}/${result.value.trim()}` : result.value.trim();
+      }
+      const lastSlash = resolvedPath.lastIndexOf('/');
+      const name = lastSlash >= 0 ? resolvedPath.slice(lastSlash + 1) : resolvedPath;
+      const parentPath = lastSlash >= 0 ? resolvedPath.slice(0, lastSlash) : undefined;
       await client.createFolder(workspaceId, name, parentPath);
     },
 
     deleteFile: (workspaceId, fileKey) => client.deleteFile(workspaceId, fileKey),
 
-    renameFile: (workspaceId, fileKey, newName) => client.renameFile(workspaceId, fileKey, newName),
+    renameFile: async (workspaceId, fileKey, newName) => {
+      let actualName = newName;
+      if (newName === PROMPT_SENTINEL) {
+        const currentName = fileKey.split('/').pop() ?? '';
+        const result = await InputDialog.getText({ title: 'Rename', text: currentName, label: 'New name' });
+        if (!result.button.accept || !result.value?.trim()) return fileKey;
+        actualName = result.value.trim();
+      }
+      return client.renameFile(workspaceId, fileKey, actualName);
+    },
 
     // Return a blob:// URL instead of the S3 presigned URL.
     // S3 URLs are cross-origin so <a download> is ignored by the browser (it
@@ -149,6 +186,74 @@ export function createJupyterCapabilities(
     onOpenViewer: (fileKey, fileName, ext) => callbacks.openViewer(fileKey, fileName, ext),
 
     onAnalyzeFile: (fileKey, fileName) => callbacks.analyzeFile(fileKey, fileName),
+
+    onConfirmDelete: (message, detail) =>
+      showDialog({
+        title: message,
+        body: detail ?? '',
+        buttons: [Dialog.cancelButton(), Dialog.warnButton({ label: 'Delete' })],
+      }).then(r => r.button.accept),
+
+    onMoveFile: async (fileKey, fileName) => {
+      const workspaceId = auth.profile?.defaultWorkspaceId ?? '';
+      if (!workspaceId) return;
+
+      const pathStack: string[] = [];
+
+      while (true) {
+        const currentPath = pathStack[pathStack.length - 1] ?? '';
+        let subfolders: string[] = [];
+        try {
+          const items = await client.getFiles(workspaceId, currentPath || undefined);
+          subfolders = items
+            .filter(i => i.type === 'folder')
+            .map(i => i.name.includes('/') ? i.name.split('/').pop()! : i.name);
+        } catch { /* ignore */ }
+
+        // Build a simple select widget
+        const pathLabel = currentPath ? `/ ${currentPath}` : '/ (workspace root)';
+        const selectId = `sb-move-select-${Date.now()}`;
+        const options = [
+          `<option value="__here__">📁 Move here  (${pathLabel})</option>`,
+          ...(pathStack.length > 0 ? [`<option value="__back__">← Back</option>`] : []),
+          ...subfolders.map(f => `<option value="__enter__:${f}">📂 ${f}</option>`),
+        ].join('');
+
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <p style="margin:0 0 8px">Move <strong>${fileName}</strong> to:</p>
+          <select id="${selectId}" style="width:100%;padding:4px;font-size:13px">${options}</select>
+        `;
+        const body = new Widget({ node: div });
+
+        const result = await showDialog({
+          title: `Move File — ${pathLabel}`,
+          body,
+          buttons: [Dialog.cancelButton(), Dialog.okButton({ label: 'Move' })],
+          focusNodeSelector: `#${selectId}`,
+        });
+
+        if (!result.button.accept) return;
+
+        const select = div.querySelector(`#${selectId}`) as HTMLSelectElement;
+        const value = select?.value ?? '__here__';
+
+        if (value === '__here__') {
+          try {
+            await client.moveFile(workspaceId, fileKey, currentPath);
+            callbacks.refreshFiles();
+          } catch (e) {
+            await showDialog({ title: 'Move failed', body: String(e), buttons: [Dialog.okButton()] });
+          }
+          return;
+        } else if (value === '__back__') {
+          pathStack.pop();
+        } else if (value.startsWith('__enter__:')) {
+          const folderName = value.slice('__enter__:'.length);
+          pathStack.push(currentPath ? `${currentPath}/${folderName}` : folderName);
+        }
+      }
+    },
 
     onDownloadFile: (blobUrl, fileName) => {
       // getFileDownloadUrl already returns a blob:// URL, so download works directly.

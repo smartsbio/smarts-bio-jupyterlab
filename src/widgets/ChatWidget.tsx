@@ -4,7 +4,7 @@
 import React from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
 import { ChatApp, ChatAction } from '@smartsbio/ui';
-import type { ContextAttachment } from '@smartsbio/ui';
+import type { ContextAttachment, SlashItem } from '@smartsbio/ui';
 import { AuthProvider } from '../auth/AuthProvider';
 import { SmartsBioClient } from '../api/SmartsBioClient';
 import { WorkspaceSelector } from '../workspace/WorkspaceSelector';
@@ -15,6 +15,7 @@ export class ChatWidget extends ReactWidget {
   private _activeStream: AbortController | undefined;
   private _context: ContextAttachment | undefined;
   private _dispatchRef = { current: null as React.Dispatch<ChatAction> | null };
+  private _slashCatalog: SlashItem[] | null = null;
 
   constructor(
     private readonly auth: AuthProvider,
@@ -29,13 +30,23 @@ export class ChatWidget extends ReactWidget {
     auth.onAuthChange((profile) => {
       this._dispatchRef.current?.({ type: 'SET_PROFILE', profile });
       this.update();
+      // Fetch slash catalog once signed in
+      if (profile) void this._handleFetchSlashCatalog();
     });
+
+    // Pre-fetch slash catalog if already signed in
+    if (auth.isAuthenticated) void this._handleFetchSlashCatalog();
   }
 
   /** Attach context (called from CellContextProvider or file context menu). */
   attachContext(context: ContextAttachment): void {
     this._context = context;
     this._dispatchRef.current?.({ type: 'SET_CONTEXT', context });
+  }
+
+  /** Insert @filename text into the chat input (called from Files panel "Analyze" action). */
+  insertText(fileName: string): void {
+    this._dispatchRef.current?.({ type: 'INSERT_TEXT', text: fileName });
   }
 
   /** Start a new conversation (called by smarts-bio:new-chat command). */
@@ -183,11 +194,13 @@ export class ChatWidget extends ReactWidget {
   private async _handleFetchSlashCatalog(): Promise<void> {
     try {
       const catalog = await this.client.getCatalog();
-      const items = [
+      const items: SlashItem[] = [
         ...catalog.tools.map((t: any) => ({ ...t, type: 'tool' as const })),
         ...catalog.pipelines.map((p: any) => ({ ...p, type: 'pipeline' as const })),
       ];
+      this._slashCatalog = items;
       this._dispatchRef.current?.({ type: 'SET_SLASH_CATALOG', items });
+      this.update();
     } catch {
       // Silently ignore — chat still works without autocomplete
     }
@@ -198,7 +211,7 @@ export class ChatWidget extends ReactWidget {
       <ChatApp
         profile={this.auth.profile}
         sendOnEnter={true}
-        slashCatalog={null}
+        slashCatalog={this._slashCatalog}
         dispatchRef={this._dispatchRef}
         onSend={async (text, mode) => {
           await this._handleSend(text, mode);

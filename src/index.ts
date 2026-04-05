@@ -105,11 +105,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         app.shell.add(widget, 'main');
         app.shell.activateById(widget.id);
       },
-      analyzeFile: (fileKey, fileName) => {
-        chatWidget.attachContext({ type: 'selection', label: fileName, content: fileKey });
+      analyzeFile: (_fileKey, fileName) => {
+        chatWidget.insertText(fileName);
         app.shell.activateById(chatWidget.id);
         void app.commands.execute('smarts-bio:open-chat');
       },
+      refreshFiles: () => explorerWidget.refresh(),
     });
 
     const explorerWidget = new ExplorerWidget(auth, workspaceSelector, capabilities);

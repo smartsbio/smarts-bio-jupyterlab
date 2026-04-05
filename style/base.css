@@ -108,6 +108,13 @@
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+/* Allow the context menu (position:fixed) to escape the explorer panel.
+   FilesPanel renders the menu with position:fixed but JupyterLab's overflow:hidden
+   on .smarts-bio-panel creates a containing block that traps it. */
+.smarts-bio-panel.smarts-bio-explorer {
+  overflow: visible;
+}
+
 /* smarts.bio logo */
 .smarts-bio-panel .sb-logo {
   width: 20px;

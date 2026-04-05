@@ -6,6 +6,7 @@ import { SmartsBioProvider, FilesPanel, ProcessesPanel } from '@smartsbio/ui';
 import type { SmartsBioCapabilities, UserProfile } from '@smartsbio/ui';
 import { AuthProvider } from '../auth/AuthProvider';
 import { WorkspaceSelector } from '../workspace/WorkspaceSelector';
+import { overrideWindowPrompt } from '../capabilities';
 
 type Tab = 'files' | 'processes';
 
@@ -101,6 +102,8 @@ export class ExplorerWidget extends ReactWidget {
   ) {
     super();
     this.addClass('smarts-bio-panel');
+    this.addClass('smarts-bio-explorer');
+    overrideWindowPrompt();
     auth.onAuthChange(() => this.update());
     workspaceSelector.onWorkspaceChange(() => this.update());
   }
