@@ -29,9 +29,12 @@ jobs:
       - name: Install JupyterLab (required for labextension build and jlpm)
         run: pip install "jupyterlab>=4.0.0,<5"
 
+      - name: Configure GitHub Packages auth
+        run: yarn config set 'npmScopes["smartsbio"].npmAuthToken' "$NPM_TOKEN"
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Install Node dependencies
-        # NPM_TOKEN is used by .npmrc to pull @smartsbio/ui from GitHub Packages.
-        # jlpm is JupyterLab's bundled yarn; use it (not npm) to keep the yarn lockfile valid.
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: jlpm install
