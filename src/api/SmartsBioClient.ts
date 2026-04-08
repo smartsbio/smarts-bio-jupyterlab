@@ -415,11 +415,19 @@ export class SmartsBioClient {
    * Accepts a File or Blob (from <input type="file"> or drag-and-drop).
    * Files >10 MB use the presigned S3 flow.
    */
-  async uploadFile(file: File, workspaceId: string): Promise<UploadedFile> {
+  async uploadFile(file: File, workspaceId: string, path?: string): Promise<UploadedFile> {
+    // Browsers expose dragged directories as File objects with no MIME type and no
+    // file extension (macOS reports size=192 for dirs, not 0, so we cannot rely on size).
+    // Attempting to upload them causes ERR_ACCESS_DENIED.
+    const hasExtension = file.name.includes('.');
+    if (file.type === '' && !hasExtension) {
+      throw new Error(`Cannot upload directory: ${file.name}`);
+    }
+
     const sizeBytes = file.size;
 
     if (sizeBytes > 10 * 1024 * 1024) {
-      return this._uploadLargeFile(file, workspaceId);
+      return this._uploadLargeFile(file, workspaceId, path);
     }
 
     // Small file: direct multipart upload
@@ -427,6 +435,7 @@ export class SmartsBioClient {
     const formData = new FormData();
     formData.append('file', file, file.name);
     formData.append('workspace_id', workspaceId);
+    if (path) formData.append('path', path);
 
     const response = await fetch(`${this.getApiBase()}/v1/files/upload`, {
       method: 'POST',
@@ -565,12 +574,12 @@ export class SmartsBioClient {
     );
   }
 
-  private async _uploadLargeFile(file: File, workspaceId: string): Promise<UploadedFile> {
+  private async _uploadLargeFile(file: File, workspaceId: string, path?: string): Promise<UploadedFile> {
     // Step 1: Get presigned URL
     const { uploadUrl, fileKey } = await this.request<{ uploadUrl: string; fileKey: string }>(
       'POST',
       '/v1/files/upload-url',
-      { fileName: file.name, sizeBytes: file.size, workspace_id: workspaceId },
+      { fileName: file.name, sizeBytes: file.size, workspace_id: workspaceId, path: path ?? '' },
     );
 
     // Step 2: Upload directly to S3

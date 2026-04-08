@@ -5,7 +5,7 @@ import type { SmartsBioCapabilities, FileItem } from '@smartsbio/ui';
 import { SmartsBioClient } from './api/SmartsBioClient';
 import { AuthProvider } from './auth/AuthProvider';
 import { CellInserter } from './notebook/CellInserter';
-import { InputDialog, showDialog, Dialog } from '@jupyterlab/apputils';
+import { InputDialog, showDialog, Dialog, Notification } from '@jupyterlab/apputils';
 import { Widget } from '@lumino/widgets';
 
 /**
@@ -125,8 +125,18 @@ export function createJupyterCapabilities(
     // ── Files panel ───────────────────────────────────────────────────────────
     listFiles: (workspaceId, path) => client.getFiles(workspaceId, path ?? undefined),
 
-    uploadFile: async (file, workspaceId, _onProgress, _path) => {
-      await client.uploadFile(file, workspaceId);
+    uploadFile: async (file, workspaceId, _onProgress, path) => {
+      // In JupyterLab, webkitGetAsEntry returns null for directories so folder drag
+      // falls back to the raw directory File object. Detect and notify the user.
+      const hasExtension = file.name.includes('.');
+      if (file.type === '' && !hasExtension) {
+        Notification.warning(
+          `Folder drag is not supported in JupyterLab. Use the Upload button to upload "${file.name}".`,
+          { autoClose: 5000 },
+        );
+        return;
+      }
+      await client.uploadFile(file, workspaceId, path);
     },
 
     createFolder: async (workspaceId, folderPath) => {
@@ -252,6 +262,63 @@ export function createJupyterCapabilities(
           const folderName = value.slice('__enter__:'.length);
           pathStack.push(currentPath ? `${currentPath}/${folderName}` : folderName);
         }
+      }
+    },
+
+    onNewFileRequest: async (folderPath) => {
+      const workspaceId = auth.profile?.defaultWorkspaceId ?? '';
+      if (!workspaceId) return;
+
+      const FILE_TYPES: { label: string; ext: string; template: string }[] = [
+        { label: 'FASTA sequence (.fasta)', ext: 'fasta', template: '>sequence_name\nACGTACGT\n' },
+        { label: 'FASTA sequence (.fa)',    ext: 'fa',    template: '>sequence_name\nACGTACGT\n' },
+        { label: 'FASTQ reads (.fastq)',    ext: 'fastq', template: '@read_name\nACGTACGT\n+\nIIIIIIII\n' },
+        { label: 'VCF variant (.vcf)',      ext: 'vcf',   template: '##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n' },
+        { label: 'PDB structure (.pdb)',    ext: 'pdb',   template: 'REMARK  Created with smarts.bio\n' },
+        { label: 'SDF molecule (.sdf)',     ext: 'sdf',   template: '\n  smarts.bio\n\n  0  0  0  0  0  0            999 V2000\nM  END\n$$$$\n' },
+        { label: 'MOL molecule (.mol)',     ext: 'mol',   template: '\n  smarts.bio\n\n  0  0  0  0  0  0            999 V2000\nM  END\n' },
+        { label: 'Python script (.py)',     ext: 'py',    template: '# Python script\n\n' },
+        { label: 'R script (.r)',           ext: 'r',     template: '# R script\n\n' },
+        { label: 'Shell script (.sh)',      ext: 'sh',    template: '#!/bin/bash\n\n' },
+        { label: 'JavaScript (.js)',        ext: 'js',    template: '' },
+        { label: 'TypeScript (.ts)',        ext: 'ts',    template: '' },
+        { label: 'CSV data (.csv)',         ext: 'csv',   template: '' },
+        { label: 'TSV data (.tsv)',         ext: 'tsv',   template: '' },
+        { label: 'JSON (.json)',            ext: 'json',  template: '{\n}\n' },
+        { label: 'YAML (.yaml)',            ext: 'yaml',  template: '' },
+        { label: 'Plain text (.txt)',       ext: 'txt',   template: '' },
+        { label: 'Markdown (.md)',          ext: 'md',    template: '# Title\n\n' },
+      ];
+
+      // Step 1 — pick file type
+      const typeResult = await InputDialog.getItem({
+        title: folderPath ? `New File in ${folderPath.split('/').pop()}` : 'New File',
+        label: 'File type',
+        items: FILE_TYPES.map(t => t.label),
+      });
+      if (!typeResult.button.accept || !typeResult.value) return;
+
+      const picked = FILE_TYPES.find(t => t.label === typeResult.value)!;
+
+      // Step 2 — enter file name (without extension)
+      const nameResult = await InputDialog.getText({
+        title: `New ${picked.label}`,
+        label: `File name (without extension — .${picked.ext} will be added automatically)`,
+        placeholder: 'e.g. my_sequences',
+      });
+      if (!nameResult.button.accept || !nameResult.value?.trim()) return;
+
+      const fileName = `${nameResult.value.trim()}.${picked.ext}`;
+      const uploadPath = folderPath || undefined;
+
+      try {
+        const blob = new Blob([picked.template], { type: 'text/plain' });
+        const file = new File([blob], fileName, { type: 'text/plain' });
+        await client.uploadFile(file, workspaceId, uploadPath);
+        callbacks.refreshFiles();
+        Notification.success(`Created ${fileName}`, { autoClose: 3000 });
+      } catch (e) {
+        Notification.error(`Failed to create file: ${e}`, { autoClose: 5000 });
       }
     },
 

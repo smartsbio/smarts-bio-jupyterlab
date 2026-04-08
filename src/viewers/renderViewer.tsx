@@ -6,6 +6,8 @@ import {
   VariantViewer,
   StructureViewer,
   CsvViewer,
+  DocumentViewer,
+  PdfViewer,
   ViewerShell,
 } from '@smartsbio/ui';
 
@@ -13,7 +15,9 @@ export const SEQUENCE_EXTS  = new Set(['.fasta', '.fa', '.fna', '.ffn', '.faa', 
 export const STRUCTURE_EXTS = new Set(['.pdb', '.cif', '.mmcif']);
 export const ALIGNMENT_EXTS = new Set(['.sam', '.bam']);
 export const VARIANT_EXTS   = new Set(['.vcf', '.bed']);
-export const CSV_EXTS       = new Set(['.csv', '.tsv']);
+export const CSV_EXTS       = new Set(['.csv', '.tsv', '.xlsx', '.xls']);
+export const DOCUMENT_EXTS  = new Set(['.md', '.docx']);
+export const PDF_EXTS       = new Set(['.pdf']);
 /** Formats that have no viewer — too binary/compressed to display meaningfully. */
 export const BINARY_EXTS    = new Set(['.cram', '.bcf', '.bw', '.bigwig']);
 
@@ -42,6 +46,8 @@ export function renderViewer(
   if (ALIGNMENT_EXTS.has(ext)) return <AlignmentViewer {...shared} />;
   if (VARIANT_EXTS.has(ext))   return <VariantViewer   {...shared} />;
   if (CSV_EXTS.has(ext))       return <CsvViewer       {...shared} />;
+  if (DOCUMENT_EXTS.has(ext))  return <DocumentViewer  {...shared} />;
+  if (PDF_EXTS.has(ext))       return <PdfViewer       fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} />;
 
   // Fallback: no visual viewer — open directly in editable text mode
   return (

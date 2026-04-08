@@ -30,6 +30,8 @@ import {
   variantLabIcon,
   structureLabIcon,
   tabularLabIcon,
+  textLabIcon,
+  pdfLabIcon,
 } from './icons/fileTypeLabIcons';
 
 const PLUGIN_ID = '@smartsbio/jupyterlab-extension:plugin';
@@ -40,7 +42,8 @@ const BIOINFORMATICS_EXTENSIONS = [
   '.pdb', '.cif', '.mmcif',
   '.sam', '.bam', '.cram',
   '.vcf', '.bcf',
-  '.csv', '.tsv',
+  '.csv', '.tsv', '.xlsx', '.xls',
+  '.md', '.docx', '.pdf',
   '.bed', '.bw', '.bigwig',
 ];
 
@@ -153,7 +156,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
         '.bam': alignmentLabIcon, '.sam': alignmentLabIcon, '.cram': alignmentLabIcon,
         '.vcf': variantLabIcon, '.bcf': variantLabIcon, '.bed': variantLabIcon,
         '.pdb': structureLabIcon, '.cif': structureLabIcon, '.mmcif': structureLabIcon,
-        '.csv': tabularLabIcon, '.tsv': tabularLabIcon,
+        '.csv': tabularLabIcon, '.tsv': tabularLabIcon, '.xlsx': tabularLabIcon, '.xls': tabularLabIcon,
+        '.md': textLabIcon, '.docx': textLabIcon, '.pdf': pdfLabIcon,
       };
 
       // Register bioinformatics file types with per-type icons
