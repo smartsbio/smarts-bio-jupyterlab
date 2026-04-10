@@ -70,6 +70,23 @@ export const pdfLabIcon = new LabIcon({
   ], '#f87171'),
 });
 
+// PNG / JPG / GIF / etc — FileEarmarkImage
+export const imageLabIcon = new LabIcon({
+  name: '@smartsbio/jupyterlab-extension:image',
+  svgstr: makeSvg([
+    'M6.502 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
+    'M14 14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h5.5L14 6.5zM4 1a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3V6.5a1 1 0 0 0-.293-.707l-4.5-4.5A1 1 0 0 0 9.5 1zm5 12H5l3-4 2 2.667L12 9l2 4H9z',
+  ], '#38bdf8'),
+});
+
+// MOL / SDF / XYZ / SMILES — Molecule icon
+const MOLECULE_PATH = 'M30.038 23.026a5 5 0 0 0-6.267.162l-2.539-2.259A5.987 5.987 0 0 0 17 12.09V9.9a5 5 0 1 0-2 0v2.19a5.986 5.986 0 0 0-4.232 8.838l-2.539 2.26a5 5 0 1 0 1.239 1.575l2.559-2.277a5.971 5.971 0 0 0 7.947 0l2.558 2.277a5 5 0 1 0 7.506-1.737ZM13 5a3 3 0 1 1 3 3 3 3 0 0 1-3-3ZM6.822 29.386a3 3 0 1 1-3.644-4.772A2.978 2.978 0 0 1 4.993 24a3 3 0 0 1 1.829 5.386Zm22.564-.565a3 3 0 1 1-.565-4.207 3 3 0 0 1 .565 4.207Z';
+
+export const moleculeLabIcon = new LabIcon({
+  name: '@smartsbio/jupyterlab-extension:molecule',
+  svgstr: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#e879f9"><path d="${MOLECULE_PATH}"/></svg>`,
+});
+
 // CSV / TSV — Grid3x3
 export const tabularLabIcon = new LabIcon({
   name: '@smartsbio/jupyterlab-extension:tabular',

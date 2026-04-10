@@ -29,9 +29,11 @@ import {
   alignmentLabIcon,
   variantLabIcon,
   structureLabIcon,
+  moleculeLabIcon,
   tabularLabIcon,
   textLabIcon,
   pdfLabIcon,
+  imageLabIcon,
 } from './icons/fileTypeLabIcons';
 
 const PLUGIN_ID = '@smartsbio/jupyterlab-extension:plugin';
@@ -43,7 +45,9 @@ const BIOINFORMATICS_EXTENSIONS = [
   '.sam', '.bam', '.cram',
   '.vcf', '.bcf',
   '.csv', '.tsv', '.xlsx', '.xls',
+  '.mol', '.sdf', '.mol2', '.xyz', '.smi', '.smiles', '.inchi',
   '.md', '.docx', '.pdf',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.tif', '.tiff', '.bmp',
   '.bed', '.bw', '.bigwig',
 ];
 
@@ -156,8 +160,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         '.bam': alignmentLabIcon, '.sam': alignmentLabIcon, '.cram': alignmentLabIcon,
         '.vcf': variantLabIcon, '.bcf': variantLabIcon, '.bed': variantLabIcon,
         '.pdb': structureLabIcon, '.cif': structureLabIcon, '.mmcif': structureLabIcon,
+        '.mol': moleculeLabIcon, '.sdf': moleculeLabIcon, '.mol2': moleculeLabIcon,
+        '.xyz': moleculeLabIcon, '.smi': moleculeLabIcon, '.smiles': moleculeLabIcon, '.inchi': moleculeLabIcon,
         '.csv': tabularLabIcon, '.tsv': tabularLabIcon, '.xlsx': tabularLabIcon, '.xls': tabularLabIcon,
         '.md': textLabIcon, '.docx': textLabIcon, '.pdf': pdfLabIcon,
+        '.png': imageLabIcon, '.jpg': imageLabIcon, '.jpeg': imageLabIcon, '.gif': imageLabIcon,
+        '.webp': imageLabIcon, '.svg': imageLabIcon, '.tif': imageLabIcon, '.tiff': imageLabIcon, '.bmp': imageLabIcon,
       };
 
       // Register bioinformatics file types with per-type icons

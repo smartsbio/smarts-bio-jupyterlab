@@ -64,7 +64,7 @@ function RemoteViewerPane({
       return;
     }
 
-    const asBinary = ext === '.bam' || ext === '.xlsx' || ext === '.xls' || ext === '.pdf' || ext === '.docx';
+    const asBinary = ext === '.bam' || ext === '.xlsx' || ext === '.xls' || ext === '.pdf' || ext === '.docx' || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.webp' || ext === '.tif' || ext === '.tiff' || ext === '.bmp' || ext === '.ico' || ext === '.svg';
     setProgress(0);
 
     // The API proxy buffers the full response, so real chunk-level progress isn't
