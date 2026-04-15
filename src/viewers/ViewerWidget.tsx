@@ -53,6 +53,7 @@ function RemoteViewerPane({
   const [content, setContent] = useState<string | Uint8Array | null>(null);
   const [error, setError]     = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
+  const [effectiveExt, setEffectiveExt] = useState(ext);
   const isDark = detectIsDark();
 
   useEffect(() => {
@@ -85,6 +86,17 @@ function RemoteViewerPane({
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         setContent(bytes);
       } else {
+        // Content-based detection: JSON with a Vega-Lite $schema → chart viewer
+        if (ext === '.json') {
+          try {
+            const peek = JSON.parse(raw.slice(0, 2000));
+            if (typeof peek.$schema === 'string' && peek.$schema.includes('vega.github.io/schema/vega-lite')) {
+              setEffectiveExt('.chart');
+              // Lazy-tag so the chart icon appears in FilesPanel on next refresh
+              client.updateFileMetadata(workspaceId, fileKey, { format: 'vega-lite' }).catch(() => { /* best-effort */ });
+            }
+          } catch { /* not valid JSON */ }
+        }
         setContent(raw);
       }
       setProgress(null);
@@ -102,7 +114,7 @@ function RemoteViewerPane({
   const handleDownload = useCallback(() => {
     if (!content) return;
     const blob = content instanceof Uint8Array
-      ? new Blob([content])
+      ? new Blob([content as BlobPart])
       : new Blob([content], { type: 'text/plain' });
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -115,15 +127,89 @@ function RemoteViewerPane({
   }, [content, fileName]);
 
   // Re-upload the edited text as a new version of the same file.
+  // Uses the presigned-URL overwrite flow so the file key stays the same.
   // Binary formats (BAM) are fetched as Uint8Array and have no text-edit path,
   // so onSave is only wired for text-based content.
   const handleSave = useCallback(async (edited: string) => {
-    const blob = new Blob([edited], { type: 'text/plain' });
-    const file = new File([blob], fileName, { type: 'text/plain' });
-    await client.uploadFile(file, workspaceId);
+    await client.saveFileContent(workspaceId, fileKey, edited);
     // Refresh content state so the viewer reflects the saved version
     setContent(edited);
-  }, [client, workspaceId, fileName]);
+  }, [client, workspaceId, fileKey]);
+
+  // Extract orgId from the current file's full S3 key so we can reconstruct keys for
+  // workspace-relative smartsbio:// URLs (new format: smartsbio://exp1/file.csv).
+  const orgId = fileKey.match(/^organizations\/([^/]+)\//)?.[1] ?? null;
+
+  // UUID pattern used to detect the legacy smartsbio://{orgId}/{wsId}/... format.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // ChartViewer: resolve smartsbio:// or https:// data refs by fetching through the API.
+  // Handles three URI formats:
+  //   smartsbio://workspace/{wsId}/{encodedKey}  (old JupyterLab/VS Code format)
+  //   smartsbio://{orgId}/{wsId}/{fileKey}       (old IDE / bio-viewers format)
+  //   smartsbio://{relPath}                      (new compact format, e.g. exp1/file.csv)
+  const onResolveRef = useCallback(async (ref: string): Promise<string | null> => {
+    try {
+      let wsId: string | null = null;
+      let key: string | null = null;
+
+      if (ref.startsWith('smartsbio://workspace/')) {
+        // Old Format 1: smartsbio://workspace/{wsId}/{encodedFullKey}
+        const rest = ref.slice('smartsbio://workspace/'.length);
+        const slashIdx = rest.indexOf('/');
+        wsId = rest.slice(0, slashIdx);
+        key  = decodeURIComponent(rest.slice(slashIdx + 1));
+      } else if (ref.startsWith('smartsbio://')) {
+        const rest = ref.slice('smartsbio://'.length);
+        const parts = rest.split('/');
+        if (parts.length >= 3 && UUID_RE.test(parts[0]) && UUID_RE.test(parts[1])) {
+          // Old Format 2: smartsbio://{orgId}/{wsId}/{relPath}
+          wsId = parts[1];
+          key  = `organizations/${parts[0]}/workspaces/${parts[1]}/${parts.slice(2).join('/')}`;
+        } else if (orgId) {
+          // New compact format: smartsbio://{workspaceRelPath} (e.g. exp1/file.csv)
+          wsId = workspaceId;
+          key  = `organizations/${orgId}/workspaces/${workspaceId}/files/${rest}`;
+        }
+      }
+
+      if (wsId && key) {
+        // Use the server-side content proxy to avoid S3 CORS restrictions.
+        return await client.getFileContent(key, wsId);
+      }
+
+      if (ref.startsWith('http://') || ref.startsWith('https://')) {
+        const resp = await fetch(ref);
+        return resp.ok ? await resp.text() : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [client, orgId, workspaceId]);
+
+  // ChartViewer: list workspace files for the data-source picker
+  const onListFiles = useCallback(
+    (path?: string) => client.getFiles(workspaceId, path),
+    [client, workspaceId],
+  );
+
+  // ChartViewer: build a compact smartsbio:// URI (workspace-relative, no orgId/wsId embedded).
+  // Example: organizations/ORG/workspaces/WS/files/exp1/data.csv → smartsbio://exp1/data.csv
+  const makeFileUrl = useCallback(
+    (key: string) => {
+      const prefix = orgId ? `organizations/${orgId}/workspaces/${workspaceId}/files/` : null;
+      const relPath = prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+      return `smartsbio://${relPath}`;
+    },
+    [orgId, workspaceId],
+  );
+
+  // ExperimentViewer: export PDF via the reports API then trigger browser download.
+  // Must be declared before any early returns to satisfy the Rules of Hooks.
+  const handleExportPdf = useCallback(async (markdown: string, title: string) => {
+    await client.generatePdf(workspaceId, markdown, title);
+  }, [client, workspaceId]);
 
   if (error)            return <ViewerShell error={error} isDark={isDark} />;
   if (content === null) return <DownloadProgress progress={progress} isDark={isDark} />;
@@ -131,7 +217,16 @@ function RemoteViewerPane({
   // Only offer save for text-based files (not BAM Uint8Array)
   const onSave = typeof content === 'string' ? handleSave : undefined;
 
-  return renderViewer(fileName, ext, content, { onSave, onDownload: handleDownload });
+  return renderViewer(fileName, effectiveExt, content, {
+    onSave,
+    onDownload: handleDownload,
+    onResolveRef,
+    onListFiles,
+    makeFileUrl,
+    workspaceId,
+    isAuthenticated: true,
+    onExportPdf: handleExportPdf,
+  });
 }
 
 // ── ReactWidget wrapper ────────────────────────────────────────────────────────

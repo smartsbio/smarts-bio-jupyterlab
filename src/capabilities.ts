@@ -269,7 +269,7 @@ export function createJupyterCapabilities(
       const workspaceId = auth.profile?.defaultWorkspaceId ?? '';
       if (!workspaceId) return;
 
-      const FILE_TYPES: { label: string; ext: string; template: string }[] = [
+      const FILE_TYPES: { label: string; ext: string; template: string; fileFormat?: string }[] = [
         { label: 'FASTA sequence (.fasta)', ext: 'fasta', template: '>sequence_name\nACGTACGT\n' },
         { label: 'FASTA sequence (.fa)',    ext: 'fa',    template: '>sequence_name\nACGTACGT\n' },
         { label: 'FASTQ reads (.fastq)',    ext: 'fastq', template: '@read_name\nACGTACGT\n+\nIIIIIIII\n' },
@@ -287,11 +287,35 @@ export function createJupyterCapabilities(
         { label: 'Shell script (.sh)',      ext: 'sh',    template: '#!/bin/bash\n\n' },
         { label: 'JavaScript (.js)',        ext: 'js',    template: '' },
         { label: 'TypeScript (.ts)',        ext: 'ts',    template: '' },
+        { label: 'Chart (.json)',           ext: 'json',  fileFormat: 'vega-lite', template: JSON.stringify({
+          $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+          width: 'container',
+          data: { values: [] },
+          mark: 'bar',
+          encoding: {
+            x: { field: 'category', type: 'nominal' },
+            y: { field: 'value', type: 'quantitative' },
+          },
+        }, null, 2) + '\n' },
         { label: 'CSV data (.csv)',         ext: 'csv',   template: '' },
         { label: 'TSV data (.tsv)',         ext: 'tsv',   template: '' },
         { label: 'JSON (.json)',            ext: 'json',  template: '{\n}\n' },
         { label: 'YAML (.yaml)',            ext: 'yaml',  template: '' },
         { label: 'Plain text (.txt)',       ext: 'txt',   template: '' },
+        { label: 'Experiment (.xpr)', ext: 'xpr', template: JSON.stringify({
+          xpr: '1.0',
+          metadata: {
+            id: crypto.randomUUID(),
+            title: 'New Experiment',
+            created: new Date().toISOString(),
+            modified: new Date().toISOString(),
+            status: 'draft',
+          },
+          sections: [
+            { id: crypto.randomUUID(), type: 'hypothesis', content: '' },
+            { id: crypto.randomUUID(), type: 'conclusion', content: '' },
+          ],
+        }, null, 2) + '\n' },
         { label: 'Markdown (.md)',          ext: 'md',    template: '# Title\n\n' },
       ];
 
@@ -319,13 +343,24 @@ export function createJupyterCapabilities(
       try {
         const blob = new Blob([picked.template], { type: 'text/plain' });
         const file = new File([blob], fileName, { type: 'text/plain' });
-        await client.uploadFile(file, workspaceId, uploadPath);
+        const uploadRes = await client.uploadFile(file, workspaceId, uploadPath);
+        // Tag files that need a format marker (e.g. vega-lite charts) so the icon appears.
+        // uploadRes shape from the API is { status, data: { key, ... } }.
+        if (picked.fileFormat) {
+          const fileKey: string | undefined = (uploadRes as any)?.data?.key;
+          if (fileKey) {
+            client.updateFileMetadata(workspaceId, fileKey, { format: picked.fileFormat }).catch(() => { /* best-effort */ });
+          }
+        }
         callbacks.refreshFiles();
         Notification.success(`Created ${fileName}`, { autoClose: 3000 });
       } catch (e) {
         Notification.error(`Failed to create file: ${e}`, { autoClose: 5000 });
       }
     },
+
+    updateFileMetadata: (workspaceId, fileKey, metadata) =>
+      client.updateFileMetadata(workspaceId, fileKey, metadata),
 
     onDownloadFile: (blobUrl, fileName) => {
       // getFileDownloadUrl already returns a blob:// URL, so download works directly.

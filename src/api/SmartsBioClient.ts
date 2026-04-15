@@ -79,6 +79,7 @@ export interface WorkspaceFileItem {
   type: 'file' | 'folder';
   size?: number;
   lastModified?: string;
+  format?: string;
 }
 
 export type ConfigGetter = () => { apiBaseUrl: string };
@@ -598,6 +599,76 @@ export class SmartsBioClient {
       fileKey,
       fileName: file.name,
     });
+  }
+
+  /**
+   * Save text content back to an existing workspace file, preserving its exact S3 key.
+   * Uses the presigned-URL flow so the PUT overwrites the same object in-place.
+   * fileKey: full S3 key, e.g. "organizations/{orgId}/workspaces/{wsId}/files/path/chart.json"
+   */
+  async saveFileContent(workspaceId: string, fileKey: string, content: string): Promise<void> {
+    // Extract workspace-relative path from the full S3 key
+    const marker = '/files/';
+    const idx = fileKey.indexOf(marker);
+    const relPath = idx >= 0 ? fileKey.slice(idx + marker.length) : fileKey;
+    const parts = relPath.split('/');
+    const fname = parts.pop()!;
+    const directory = parts.join('/');
+
+    const ext = fname.split('.').pop()?.toLowerCase() ?? '';
+    const contentTypeMap: Record<string, string> = {
+      json: 'application/json', xpr: 'application/json',
+      csv: 'text/csv', tsv: 'text/tab-separated-values',
+      txt: 'text/plain', md: 'text/markdown',
+      py: 'text/x-python',
+    };
+    const contentType = contentTypeMap[ext] ?? 'text/plain';
+
+    // Use the direct upload endpoint (multipart/form-data) so the S3 write is performed
+    // server-side. This avoids the S3 CORS block that occurs when the browser (running on
+    // localhost:8888 in JupyterLab) tries to PUT directly to an S3 presigned URL.
+    const { apiBaseUrl } = this.getConfig();
+    const token = await this.auth.getToken();
+
+    const form = new FormData();
+    form.append('file', new Blob([content], { type: contentType }), fname);
+    form.append('workspace_id', workspaceId);
+    if (directory) form.append('path', directory);
+
+    const res = await fetch(`${apiBaseUrl}/v1/files/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error((err as any).message ?? `Upload failed: ${res.status}`);
+    }
+  }
+
+  async updateFileMetadata(workspaceId: string, fileKey: string, metadata: Record<string, unknown>): Promise<void> {
+    await this.request('PATCH', '/v1/files/metadata', { workspace_id: workspaceId, fileKey, metadata });
+  }
+
+  async generatePdf(workspaceId: string, markdown: string, title: string): Promise<void> {
+    const result = await this.request<{ status: string; data: { pdfBase64: string } }>(
+      'POST',
+      '/v1/reports/generate-pdf',
+      { workspace_id: workspaceId, title, markdown },
+    );
+    const base64 = result.data.pdfBase64;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-zA-Z0-9_\- ]/g, '_')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 
