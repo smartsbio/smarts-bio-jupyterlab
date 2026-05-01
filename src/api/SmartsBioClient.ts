@@ -650,6 +650,74 @@ export class SmartsBioClient {
     await this.request('PATCH', '/v1/files/metadata', { workspace_id: workspaceId, fileKey, metadata });
   }
 
+  /**
+   * Stream analysis events from bio-analytics for a workspace file.
+   * Yields named SSE events as they arrive (progress, classification, metrics, etc.)
+   */
+  async *streamAnalysis(
+    fileKey: string,
+    viewerType: string,
+    workspaceId: string,
+    parameters?: Record<string, unknown>,
+  ): AsyncGenerator<{ event: string; data: Record<string, unknown> }> {
+    const token = await this.auth.getToken();
+    const response = await fetch(`${this.getApiBase()}/v1/analytics/stream`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({ fileKey, viewerType, workspaceId, parameters: parameters ?? {} }),
+    });
+
+    if (response.status === 401) {
+      const refreshed = await this.auth.handleUnauthorized();
+      if (!refreshed) {
+        yield { event: 'error', data: { message: 'Authentication required. Please sign in.' } };
+        return;
+      }
+      yield* this.streamAnalysis(fileKey, viewerType, workspaceId, parameters);
+      return;
+    }
+
+    if (!response.ok || !response.body) {
+      yield { event: 'error', data: { message: `API error ${response.status}: ${response.statusText}` } };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let eventName = 'message';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line === '') {
+            eventName = 'message';
+          } else if (line.startsWith('event: ')) {
+            eventName = line.slice('event: '.length).trim();
+          } else if (line.startsWith('data: ')) {
+            if (eventName === 'done') return;
+            try {
+              const data = JSON.parse(line.slice('data: '.length)) as Record<string, unknown>;
+              yield { event: eventName, data };
+            } catch { /* skip malformed lines */ }
+          }
+        }
+      }
+    } finally {
+      reader.cancel();
+    }
+  }
+
   async generatePdf(workspaceId: string, markdown: string, title: string): Promise<void> {
     const result = await this.request<{ status: string; data: { pdfBase64: string } }>(
       'POST',

@@ -7,6 +7,7 @@ import { SmartsBioClient } from '../api/SmartsBioClient';
 import {
   BINARY_EXTS,
   detectIsDark,
+  extToViewerType,
   renderViewer,
 } from './renderViewer';
 
@@ -211,6 +212,14 @@ function RemoteViewerPane({
     await client.generatePdf(workspaceId, markdown, title);
   }, [client, workspaceId]);
 
+  const viewerType = extToViewerType(effectiveExt);
+
+  const handleAnalyze = useCallback((...args: unknown[]) => {
+    const sequenceType = typeof args[0] === 'string' ? args[0] : undefined;
+    const parameters: Record<string, unknown> = sequenceType ? { sequence_type: sequenceType } : {};
+    return client.streamAnalysis(fileKey, viewerType, workspaceId, parameters);
+  }, [client, fileKey, viewerType, workspaceId]);
+
   if (error)            return <ViewerShell error={error} isDark={isDark} />;
   if (content === null) return <DownloadProgress progress={progress} isDark={isDark} />;
 
@@ -220,6 +229,7 @@ function RemoteViewerPane({
   return renderViewer(fileName, effectiveExt, content, {
     onSave,
     onDownload: handleDownload,
+    onAnalyze: handleAnalyze,
     onResolveRef,
     onListFiles,
     makeFileUrl,

@@ -37,6 +37,7 @@ interface ViewerProps {
   onSave?: (content: string) => Promise<void>;
   onDownload?: () => void;
   onUpload?: () => void;
+  onAnalyze?: (...args: unknown[]) => AsyncIterable<{ event: string; data: Record<string, unknown> }>;
   onResolveRef?: (ref: string) => Promise<string | null>;
   onListFiles?: (path?: string) => Promise<{ key: string; name: string; type: 'file' | 'folder' }[]>;
   makeFileUrl?: (fileKey: string) => string;
@@ -45,15 +46,29 @@ interface ViewerProps {
   onExportPdf?: (markdown: string, title: string) => Promise<void>;
 }
 
+/** Map file extension to the viewerType expected by bio-analytics. */
+export function extToViewerType(ext: string): string {
+  if (SEQUENCE_EXTS.has(ext))   return 'sequence';
+  if (STRUCTURE_EXTS.has(ext))  return 'structure';
+  if (ALIGNMENT_EXTS.has(ext))  return 'alignment';
+  if (VARIANT_EXTS.has(ext))    return 'variant';
+  if (CSV_EXTS.has(ext))        return 'data';
+  if (MOLECULE_EXTS.has(ext))   return 'molecule';
+  if (DOCUMENT_EXTS.has(ext))   return 'document';
+  if (PDF_EXTS.has(ext))        return 'pdf';
+  if (IMAGE_EXTS.has(ext))      return 'image';
+  return 'text';
+}
+
 /** Return the appropriate @smartsbio/ui viewer React element for the given file. */
 export function renderViewer(
   fileName: string,
   ext: string,
   content: string | Uint8Array,
-  { onSave, onDownload, onUpload, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf }: ViewerProps = {},
+  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf }: ViewerProps = {},
 ): React.ReactElement {
   const isDark = detectIsDark();
-  const shared = { fileContent: content, fileName, isDark, onSave, onDownload, onUpload };
+  const shared = { fileContent: content, fileName, isDark, onSave, onDownload, onUpload, onAnalyze: onAnalyze as any };
 
   if (SEQUENCE_EXTS.has(ext))    return <SequenceViewer  {...shared} />;
   if (STRUCTURE_EXTS.has(ext))   return <StructureViewer {...shared} />;
@@ -62,8 +77,8 @@ export function renderViewer(
   if (CSV_EXTS.has(ext))         return <CsvViewer       {...shared} />;
   if (MOLECULE_EXTS.has(ext))    return <MoleculeViewer  {...shared} />;
   if (DOCUMENT_EXTS.has(ext))    return <DocumentViewer  {...shared} />;
-  if (PDF_EXTS.has(ext))         return <PdfViewer       fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} />;
-  if (IMAGE_EXTS.has(ext))       return <ImageViewer     fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} />;
+  if (PDF_EXTS.has(ext))         return <PdfViewer       fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
+  if (IMAGE_EXTS.has(ext))       return <ImageViewer     fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
 
   // Vega-Lite chart: detected by caller via $schema inspection
   if (ext === '.chart') return <ChartViewer fileContent={content as string} fileName={fileName} isDark={isDark} onSave={onSave} onDownload={onDownload} onResolveRef={onResolveRef} onListFiles={onListFiles} makeFileUrl={makeFileUrl} />;
