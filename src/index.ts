@@ -20,8 +20,9 @@ import { CellInserter } from './notebook/CellInserter';
 import { CellContextProvider } from './notebook/CellContextProvider';
 import { KernelContextBridge } from './notebook/KernelContextBridge';
 import { StatusBarWidget } from './statusbar/StatusBarWidget';
-import { ViewerWidgetFactory } from './viewers/ViewerWidgetFactory';
+import { ViewerWidgetFactory, LOCAL_BINARY_EXTS } from './viewers/ViewerWidgetFactory';
 import { openViewerWidget } from './viewers/ViewerWidget';
+import { Base64ModelFactory } from '@jupyterlab/docregistry';
 import { LabIcon } from '@jupyterlab/ui-components';
 import { smartsBioIcon } from './icons';
 import {
@@ -30,7 +31,9 @@ import {
   variantLabIcon,
   structureLabIcon,
   moleculeLabIcon,
+  xprLabIcon,
   tabularLabIcon,
+  xlsxLabIcon,
   textLabIcon,
   pdfLabIcon,
   imageLabIcon,
@@ -41,15 +44,16 @@ const PLUGIN_ID = '@smartsbio/jupyterlab-extension:plugin';
 // File types handled by the custom viewer factory
 const BIOINFORMATICS_EXTENSIONS = [
   '.fasta', '.fa', '.fna', '.ffn', '.faa', '.frn', '.fastq', '.fq',
-  '.pdb', '.cif', '.mmcif',
-  '.sam', '.bam', '.cram',
-  '.vcf', '.bcf',
+  '.gb', '.gbk', '.genbank',
+  '.pdb', '.ent', '.cif', '.mmcif',
+  '.sam', '.bam', '.cram', '.bai',
+  '.vcf', '.bcf', '.bed',
   '.csv', '.tsv', '.xlsx', '.xls',
   '.mol', '.sdf', '.mol2', '.xyz', '.smi', '.smiles', '.inchi',
   '.xpr',
   '.md', '.docx', '.pdf',
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.tif', '.tiff', '.bmp',
-  '.bed', '.bw', '.bigwig',
+  '.bw', '.bigwig',
 ];
 
 const plugin: JupyterFrontEndPlugin<void> = {
@@ -158,13 +162,15 @@ const plugin: JupyterFrontEndPlugin<void> = {
         '.fasta': sequenceLabIcon, '.fa': sequenceLabIcon, '.fna': sequenceLabIcon,
         '.ffn': sequenceLabIcon, '.faa': sequenceLabIcon, '.frn': sequenceLabIcon,
         '.fastq': sequenceLabIcon, '.fq': sequenceLabIcon,
-        '.bam': alignmentLabIcon, '.sam': alignmentLabIcon, '.cram': alignmentLabIcon,
+        '.gb': sequenceLabIcon, '.gbk': sequenceLabIcon, '.genbank': sequenceLabIcon,
+        '.bam': alignmentLabIcon, '.sam': alignmentLabIcon, '.cram': alignmentLabIcon, '.bai': alignmentLabIcon,
         '.vcf': variantLabIcon, '.bcf': variantLabIcon, '.bed': variantLabIcon,
-        '.pdb': structureLabIcon, '.cif': structureLabIcon, '.mmcif': structureLabIcon,
+        '.pdb': structureLabIcon, '.ent': structureLabIcon, '.cif': structureLabIcon, '.mmcif': structureLabIcon,
         '.mol': moleculeLabIcon, '.sdf': moleculeLabIcon, '.mol2': moleculeLabIcon,
         '.xyz': moleculeLabIcon, '.smi': moleculeLabIcon, '.smiles': moleculeLabIcon, '.inchi': moleculeLabIcon,
-        '.csv': tabularLabIcon, '.tsv': tabularLabIcon, '.xlsx': tabularLabIcon, '.xls': tabularLabIcon,
-        '.xpr': textLabIcon,
+        '.csv': tabularLabIcon, '.tsv': tabularLabIcon,
+        '.xlsx': xlsxLabIcon, '.xls': xlsxLabIcon,
+        '.xpr': xprLabIcon,
         '.md': textLabIcon, '.docx': textLabIcon, '.pdf': pdfLabIcon,
         '.png': imageLabIcon, '.jpg': imageLabIcon, '.jpeg': imageLabIcon, '.gif': imageLabIcon,
         '.webp': imageLabIcon, '.svg': imageLabIcon, '.tif': imageLabIcon, '.tiff': imageLabIcon, '.bmp': imageLabIcon,
@@ -181,12 +187,51 @@ const plugin: JupyterFrontEndPlugin<void> = {
         });
       }
 
-      const factory = new ViewerWidgetFactory({
+      // Split into text and binary factories.
+      // The text factory uses JupyterLab's default 'text' model (UTF-8 fetch).
+      // The binary factory uses the 'base64' model so the server returns base64
+      // content instead of trying to decode binary bytes as UTF-8.
+      const binaryExts    = BIOINFORMATICS_EXTENSIONS.filter(e => LOCAL_BINARY_EXTS.has(e));
+      const textExts      = BIOINFORMATICS_EXTENSIONS.filter(e => !LOCAL_BINARY_EXTS.has(e));
+      const binaryTypes   = binaryExts.map(e => `smarts-bio${e}`);
+      const textTypes     = textExts.map(e => `smarts-bio${e}`);
+
+      // JupyterLab built-in type names (one per format, NOT 'image').
+      const IMAGE_BUILTIN_TYPES = ['jpeg', 'png', 'gif', 'svg', 'tiff', 'bmp', 'webp'];
+
+      // Register Base64ModelFactory so the binary factory can use it.
+      docRegistry.addModelFactory(new Base64ModelFactory());
+
+      const textFactory = new ViewerWidgetFactory({
         name: 'smarts.bio Viewer',
-        fileTypes: BIOINFORMATICS_EXTENSIONS.map(e => `smarts-bio${e}`),
-        defaultFor: BIOINFORMATICS_EXTENSIONS.map(e => `smarts-bio${e}`),
+        fileTypes: textTypes,
+        defaultFor: textTypes,
+        client,
+        auth,
       });
-      docRegistry.addWidgetFactory(factory);
+      docRegistry.addWidgetFactory(textFactory);
+
+      const binaryFactory = new ViewerWidgetFactory({
+        name: 'smarts.bio Binary Viewer',
+        modelName: 'base64',
+        fileTypes: [...binaryTypes, ...IMAGE_BUILTIN_TYPES],
+        defaultFor: [...binaryTypes, ...IMAGE_BUILTIN_TYPES],
+        client,
+        auth,
+      });
+      docRegistry.addWidgetFactory(binaryFactory);
+
+      // Override built-in image type defaults after all plugins load.
+      // @jupyterlab/image-extension activates after us and would otherwise
+      // overwrite defaultFor entries — setDefaultWidgetFactory wins because
+      // it writes to _defaultWidgetFactoryOverrides (checked before _defaultWidgetFactories).
+      void app.restored.then(() => {
+        for (const type of IMAGE_BUILTIN_TYPES) {
+          try {
+            docRegistry.setDefaultWidgetFactory(type, 'smarts.bio Binary Viewer');
+          } catch { /* type not installed in this JupyterLab build */ }
+        }
+      });
     }
 
     // ── Add "Analyze with smarts.bio" notebook toolbar button ─────────────────

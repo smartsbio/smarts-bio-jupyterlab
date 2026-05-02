@@ -1592,7 +1592,7 @@ __metadata:
     "@jupyterlab/statusbar": ^4.0.0
     "@jupyterlab/ui-components": ^4.0.0
     "@lumino/widgets": ^2.0.0
-    "@smartsbio/ui": ^0.1.17
+    "@smartsbio/ui": ^0.1.18
     "@types/react": ^18.2.0
     "@types/react-dom": ^18.2.0
     marked: ^17.0.4
@@ -1609,10 +1609,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@smartsbio/ui@npm:^0.1.17":
-  version: 0.1.17
-  resolution: "@smartsbio/ui@npm:0.1.17::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40smartsbio%2Fui%2F0.1.17%2Fc493708a8943b600a37552245212858dc4f05efe"
+"@smartsbio/ui@npm:^0.1.18":
+  version: 0.1.18
+  resolution: "@smartsbio/ui@npm:0.1.18::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40smartsbio%2Fui%2F0.1.18%2Fbca9346a3eaa49b8e3fd0e4356aac71d0b53ca3e"
   dependencies:
+    highlight.js: ^11.11.1
     mammoth: ^1.12.0
     marked: ^17.0.4
     react-bootstrap-icons: ^1.11.4
@@ -1620,7 +1621,7 @@ __metadata:
   peerDependencies:
     react: ">=18.0.0"
     react-dom: ">=18.0.0"
-  checksum: ff68f7d129e133bad5cbfc5aa7c27090b62d1985f56124c50dc064acba35f46ede19d68137b823fd80e5f4113653112244b1b4d356cbefce1002e219e5820547
+  checksum: 473fca8aee4e50235341a455618b0e739e506b81ae00e542ed05db897cad3edd6de15b93830b2edbeb6322d8c62a97915190f98af4befd5fffa14a8037ec0b96
   languageName: node
   linkType: hard
 
@@ -4252,6 +4253,13 @@ __metadata:
   dependencies:
     function-bind: ^1.1.2
   checksum: e8516f776a15149ca6c6ed2ae3110c417a00b62260e222590e54aa367cbcd6ed99122020b37b7fbdf05748df57b265e70095d7bf35a47660587619b15ffb93db
+  languageName: node
+  linkType: hard
+
+"highlight.js@npm:^11.11.1":
+  version: 11.11.1
+  resolution: "highlight.js@npm:11.11.1"
+  checksum: 841ddd329a92be123a61ef4051698f824c3575deef588fbb810bd638f1575ddc96b7bdd925b97c05a29276bb119dfcb8e5bcb0acb31c86249371bf046e131d72
   languageName: node
   linkType: hard
 

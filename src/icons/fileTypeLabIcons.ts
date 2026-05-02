@@ -1,96 +1,26 @@
 /**
  * LabIcon instances for bioinformatics file types shown in the JupyterLab file browser.
- * SVG paths sourced from Bootstrap Icons 1.x (MIT) and Font Awesome Free 5.x (CC BY 4.0).
- * Colors match the smarts.bio file explorer panel (see src/utils/fileIcons.tsx).
+ * Icons are sourced from @smartsbio/ui's getFileIconSvg so they stay in sync with the
+ * VS Code icon theme and the smarts.bio FILES panel.
  */
 import { LabIcon } from '@jupyterlab/ui-components';
+import { getFileIconSvg } from '@smartsbio/ui';
 
-const makeSvg = (paths: string[], color: string, viewBox = '0 0 16 16'): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="${color}">${paths.map(d => `<path d="${d}"/>`).join('')}</svg>`;
+const labIcon = (name: string, ext: string): LabIcon =>
+  new LabIcon({ name: `@smartsbio/jupyterlab-extension:${name}`, svgstr: getFileIconSvg(ext) });
 
-// ── Font Awesome DNA (CC BY 4.0) — for FASTA / FASTQ ────────────────────────
-const FA_DNA =
-  'M.1 494.1c-1.1 9.5 6.3 17.8 15.9 17.8l32.3.1c8.1 0 14.9-5.9 16-13.9.7-4.9 1.8-11.1' +
-  ' 3.4-18.1H380c1.6 6.9 2.9 13.2 3.5 18.1 1.1 8 7.9 14 16 13.9l32.3-.1c9.6 0 17.1-8.3' +
-  ' 15.9-17.8-4.6-37.9-25.6-129-118.9-207.7-17.6 12.4-37.1 24.2-58.5 35.4 6.2 4.6 11.4' +
-  ' 9.4 17 14.2H159.7c21.3-18.1 47-35.6 78.7-51.4C410.5 199.1 442.1 65.8 447.9 17.9 449' +
-  ' 8.4 441.6.1 432 .1L399.6 0c-8.1 0-14.9 5.9-16 13.9-.7 4.9-1.8 11.1-3.4 18.1H67.8c' +
-  '-1.6-7-2.7-13.1-3.4-18.1-1.1-8-7.9-14-16-13.9L16.1.1C6.5.1-1 8.4.1 17.9 5.3 60.8' +
-  ' 31.4 171.8 160 256 31.5 340.2 5.3 451.2.1 494.1zM224 219.6c-25.1-13.7-46.4-28.4' +
-  '-64.3-43.6h128.5c-17.8 15.2-39.1 30-64.2 43.6zM355.1 96c-5.8 10.4-12.8 21.1-21' +
-  ' 32H114c-8.3-10.9-15.3-21.6-21-32h262.1zM92.9 416c5.8-10.4 12.8-21.1 21-32h219.4c' +
-  '8.3 10.9 15.4 21.6 21.2 32H92.9z';
-
-export const sequenceLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:sequence',
-  svgstr: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="#4ade80"><path d="${FA_DNA}"/></svg>`,
-});
-
-// ── Bootstrap Icons ──────────────────────────────────────────────────────────
-
-// BAM / SAM / CRAM — BarChartSteps
-export const alignmentLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:alignment',
-  svgstr: makeSvg([
-    'M.5 0a.5.5 0 0 1 .5.5v15a.5.5 0 0 1-1 0V.5A.5.5 0 0 1 .5 0M2 1.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5zm2 4a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5zm2 4a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-6a.5.5 0 0 1-.5-.5zm2 4a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z',
-  ], '#60a5fa'),
-});
-
-// VCF / BCF / BED — Virus
-export const variantLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:variant',
-  svgstr: makeSvg([
-    'M8 0a1 1 0 0 1 1 1v1.402c0 .511.677.693.933.25l.7-1.214a1 1 0 0 1 1.733 1l-.701 1.214c-.256.443.24.939.683.683l1.214-.701a1 1 0 0 1 1 1.732l-1.214.701c-.443.256-.262.933.25.933H15a1 1 0 1 1 0 2h-1.402c-.512 0-.693.677-.25.933l1.214.701a1 1 0 1 1-1 1.732l-1.214-.7c-.443-.257-.939.24-.683.682l.701 1.214a1 1 0 1 1-1.732 1l-.701-1.214c-.256-.443-.933-.262-.933.25V15a1 1 0 1 1-2 0v-1.402c0-.512-.677-.693-.933-.25l-.701 1.214a1 1 0 0 1-1.732-1l.7-1.214c.257-.443-.24-.939-.682-.683l-1.214.701a1 1 0 1 1-1-1.732l1.214-.701c.443-.256.261-.933-.25-.933H1a1 1 0 1 1 0-2h1.402c.511 0 .693-.677.25-.933l-1.214-.701a1 1 0 1 1 1-1.732l1.214.701c.443.256.939-.24.683-.683l-.701-1.214a1 1 0 0 1 1.732-1l.701 1.214c.256.443.933.261.933-.25V1a1 1 0 0 1 1-1m2 5a1 1 0 1 0-2 0 1 1 0 0 0 2 0M6 7a1 1 0 1 0-2 0 1 1 0 0 0 2 0m1 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m5-3a1 1 0 1 0-2 0 1 1 0 0 0 2 0',
-  ], '#f472b6'),
-});
-
-// PDB / CIF — Pentagon
-export const structureLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:structure',
-  svgstr: makeSvg([
-    'M7.685 1.545a.5.5 0 0 1 .63 0l6.263 5.088a.5.5 0 0 1 .161.539l-2.362 7.479a.5.5 0 0 1-.476.349H4.099a.5.5 0 0 1-.476-.35L1.26 7.173a.5.5 0 0 1 .161-.54l6.263-5.087Zm8.213 5.28a.5.5 0 0 0-.162-.54L8.316.257a.5.5 0 0 0-.631 0L.264 6.286a.5.5 0 0 0-.162.538l2.788 8.827a.5.5 0 0 0 .476.349h9.268a.5.5 0 0 0 .476-.35l2.788-8.826Z',
-  ], '#c084fc'),
-});
-
-// MD / DOCX — FileEarmarkText
-export const textLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:text',
-  svgstr: makeSvg([
-    'M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5',
-    'M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z',
-  ], '#94a3b8'),
-});
-
-// PDF — FileEarmarkPdf
-export const pdfLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:pdf',
-  svgstr: makeSvg([
-    'M5.523 12.424q.21-.124.459-.238a8 8 0 0 1-.45.606c-.28.337-.498.516-.635.572l-.035.012a.3.3 0 0 1-.026-.044c-.056-.11-.054-.216.04-.36q.106-.17.647-.548m-1.128 1.311.03-.022.055-.036.013-.007.003-.001a.5.5 0 0 0 .078-.048c.15-.12.356-.324.552-.54.596-.648 1.064-1.427 1.36-1.933a3 3 0 0 1 .527-.588.5.5 0 0 1 .235-.128c.01-.002.019-.003.028-.003.061 0 .124.025.172.055.09.056.17.138.222.224.1.164.123.332.083.492-.038.144-.113.26-.224.349-.097.075-.218.13-.356.173-.178.054-.376.09-.565.128-.186.037-.37.072-.538.12-.35.1-.571.238-.697.454-.151.265-.11.537.052.713.1.107.245.173.418.186.225.017.489-.045.726-.193.29-.181.503-.465.626-.783.052-.133.085-.27.09-.405a6.5 6.5 0 0 0 1.096.066 6 6 0 0 0-.004.394c0 .22.037.435.117.628.16.388.458.64.864.64.3 0 .57-.13.78-.36.19-.21.31-.497.31-.822 0-.297-.1-.567-.273-.768-.174-.2-.417-.32-.694-.32h-.02a6 6 0 0 0-.01-.553 6.5 6.5 0 0 0 .777-.32c.23-.12.43-.268.58-.452.17-.208.27-.47.27-.773a.7.7 0 0 0-.23-.544c-.168-.148-.4-.22-.664-.22-.45 0-.9.19-1.25.49-.174.15-.32.324-.43.51-.01.02-.02.038-.03.057a3 3 0 0 0-.147-.05c-.35-.1-.78-.15-1.2-.15-.386 0-.76.04-1.073.127a3.6 3.6 0 0 0-.527.19 4 4 0 0 0-.418-.605 3.6 3.6 0 0 0-.488-.476c-.188-.148-.41-.26-.653-.26-.35 0-.624.167-.778.46-.12.23-.146.498-.085.762.067.286.227.57.45.83.148.172.322.33.514.468a3.7 3.7 0 0 0 .688.336',
-    'M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z',
-  ], '#f87171'),
-});
-
-// PNG / JPG / GIF / etc — FileEarmarkImage
-export const imageLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:image',
-  svgstr: makeSvg([
-    'M6.502 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3',
-    'M14 14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h5.5L14 6.5zM4 1a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3V6.5a1 1 0 0 0-.293-.707l-4.5-4.5A1 1 0 0 0 9.5 1zm5 12H5l3-4 2 2.667L12 9l2 4H9z',
-  ], '#38bdf8'),
-});
-
-// MOL / SDF / XYZ / SMILES — Molecule icon
-const MOLECULE_PATH = 'M30.038 23.026a5 5 0 0 0-6.267.162l-2.539-2.259A5.987 5.987 0 0 0 17 12.09V9.9a5 5 0 1 0-2 0v2.19a5.986 5.986 0 0 0-4.232 8.838l-2.539 2.26a5 5 0 1 0 1.239 1.575l2.559-2.277a5.971 5.971 0 0 0 7.947 0l2.558 2.277a5 5 0 1 0 7.506-1.737ZM13 5a3 3 0 1 1 3 3 3 3 0 0 1-3-3ZM6.822 29.386a3 3 0 1 1-3.644-4.772A2.978 2.978 0 0 1 4.993 24a3 3 0 0 1 1.829 5.386Zm22.564-.565a3 3 0 1 1-.565-4.207 3 3 0 0 1 .565 4.207Z';
-
-export const moleculeLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:molecule',
-  svgstr: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#e879f9"><path d="${MOLECULE_PATH}"/></svg>`,
-});
-
-// CSV / TSV — Grid3x3
-export const tabularLabIcon = new LabIcon({
-  name: '@smartsbio/jupyterlab-extension:tabular',
-  svgstr: makeSvg([
-    'M0 1.5A1.5 1.5 0 0 1 1.5 0h13A1.5 1.5 0 0 1 16 1.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 14.5zM1.5 1a.5.5 0 0 0-.5.5V5h4V1zM5 6H1v4h4zm1 4h4V6H6zm-1 1H1v3.5a.5.5 0 0 0 .5.5H5zm1 0v4h4v-4zm5 0v4h3.5a.5.5 0 0 0 .5-.5V11zm0-1h4V6h-4zm0-5h4V1.5a.5.5 0 0 0-.5-.5H11zm-1 0V1H6v4z',
-  ], '#34d399'),
-});
+export const sequenceLabIcon  = labIcon('sequence',  'fasta');
+export const alignmentLabIcon = labIcon('alignment', 'bam');
+export const variantLabIcon   = labIcon('variant',   'vcf');
+export const structureLabIcon = labIcon('structure', 'pdb');
+export const moleculeLabIcon  = labIcon('molecule',  'mol');
+export const xprLabIcon       = labIcon('xpr',       'xpr');
+export const tabularLabIcon   = labIcon('tabular',   'csv');
+export const xlsxLabIcon      = labIcon('xlsx',      'xlsx');
+export const textLabIcon      = labIcon('text',      'md');
+export const pdfLabIcon       = labIcon('pdf',       'pdf');
+export const imageLabIcon     = labIcon('image',     'png');
+export const codeLabIcon      = labIcon('code',      'py');
+export const jsonLabIcon      = labIcon('json',      'json');
+export const dataLabIcon      = labIcon('data',      'yaml');
+export const zipLabIcon       = labIcon('zip',       'gz');

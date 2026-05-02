@@ -718,6 +718,84 @@ export class SmartsBioClient {
     }
   }
 
+  /**
+   * Stream analysis events for a LOCAL file by sending its content directly.
+   * Mirrors VS Code's streamAnalysisLocal: POSTs { fileContent, isBinary, fileName, viewerType }.
+   */
+  async *streamAnalysisLocal(
+    fileContent: string,
+    isBinary: boolean,
+    fileName: string,
+    viewerType: string,
+    parameters?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): AsyncGenerator<{ event: string; data: Record<string, unknown> }> {
+    const token = await this.auth.getToken();
+    let response: Response;
+    try {
+      response = await fetch(`${this.getApiBase()}/v1/analytics/stream`, {
+        method: 'POST',
+        signal,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify({ fileContent, isBinary, fileName, viewerType, parameters: parameters ?? {} }),
+      });
+    } catch (err: unknown) {
+      if ((err as { name?: string })?.name !== 'AbortError') {
+        yield { event: 'error', data: { message: (err as Error)?.message ?? 'Network error' } };
+      }
+      return;
+    }
+
+    if (response.status === 401) {
+      const refreshed = await this.auth.handleUnauthorized();
+      if (!refreshed) {
+        yield { event: 'error', data: { message: 'Authentication required. Please sign in.' } };
+        return;
+      }
+      yield* this.streamAnalysisLocal(fileContent, isBinary, fileName, viewerType, parameters, signal);
+      return;
+    }
+
+    if (!response.ok || !response.body) {
+      yield { event: 'error', data: { message: `API error ${response.status}: ${response.statusText}` } };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let eventName = 'message';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line === '') {
+            eventName = 'message';
+          } else if (line.startsWith('event: ')) {
+            eventName = line.slice('event: '.length).trim();
+          } else if (line.startsWith('data: ')) {
+            if (eventName === 'done') return;
+            try {
+              const data = JSON.parse(line.slice('data: '.length)) as Record<string, unknown>;
+              yield { event: eventName, data };
+            } catch { /* skip malformed lines */ }
+          }
+        }
+      }
+    } finally {
+      reader.cancel();
+    }
+  }
+
   async generatePdf(workspaceId: string, markdown: string, title: string): Promise<void> {
     const result = await this.request<{ status: string; data: { pdfBase64: string } }>(
       'POST',
