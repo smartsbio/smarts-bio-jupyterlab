@@ -82,7 +82,7 @@ export interface WorkspaceFileItem {
   format?: string;
 }
 
-export type ConfigGetter = () => { apiBaseUrl: string };
+export type ConfigGetter = () => { apiBaseUrl: string; searchApiUrl?: string; biographApiUrl?: string };
 
 /**
  * All smarts.bio API communication lives here.
@@ -93,6 +93,9 @@ export class SmartsBioClient {
     private readonly auth: AuthProvider,
     private readonly getConfig: ConfigGetter,
   ) {}
+
+  get isAuthenticated(): boolean { return this.auth.isAuthenticated; }
+  signIn(): Promise<void> { return this.auth.signIn(); }
 
   private getApiBase(): string {
     return this.getConfig().apiBaseUrl;
@@ -815,6 +818,68 @@ export class SmartsBioClient {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  // ── Bio Search ──────────────────────────────────────────────────────────────
+
+  private getSearchApiBase(): string {
+    return this.getConfig().searchApiUrl ?? 'http://localhost:3020';
+  }
+
+  /** Returns raw SSE Response from the bio-search service (caller reads the stream). */
+  async fetchBioSearchStream(query: string, signal: AbortSignal): Promise<Response> {
+    const token = await this.auth.getToken().catch(() => '');
+    return fetch(`${this.getSearchApiBase()}/api/v1/biosearch/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ query }),
+      signal,
+    });
+  }
+
+  // ── Graph Explorer ──────────────────────────────────────────────────────────
+
+  private getBiographApiBase(): string {
+    return this.getConfig().biographApiUrl ?? 'http://localhost:3030';
+  }
+
+  async getGraphNetwork(params: {
+    entity: string;
+    type: string;
+    depth: number;
+    limit: number;
+    nodeTypes?: string[];
+  }): Promise<unknown> {
+    const qs = new URLSearchParams({
+      depth: String(params.depth),
+      limit: String(params.limit ?? 50),
+    });
+    if (params.nodeTypes && params.nodeTypes.length > 0) {
+      qs.set('nodeTypes', params.nodeTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(','));
+    }
+    const url = `${this.getBiographApiBase()}/api/v1/network/${encodeURIComponent(params.type)}/${encodeURIComponent(params.entity)}?${qs}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
+      throw new Error(body.message ?? body.error ?? `Network request failed (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async getEntityDetail(entityType: string, entityId: string): Promise<unknown> {
+    const COLLECTION: Record<string, string> = {
+      gene: 'genes', protein: 'proteins', variant: 'variants',
+      disease: 'diseases', pathway: 'pathways', drug: 'drugs',
+      conserved_domain: 'conserved_domains',
+    };
+    const collection = COLLECTION[entityType.toLowerCase()] ?? entityType;
+    const url = `${this.getBiographApiBase()}/api/v1/${collection}/${encodeURIComponent(entityId)}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`Entity detail failed: ${res.status}`);
+    return res.json();
   }
 }
 

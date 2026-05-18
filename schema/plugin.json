@@ -16,6 +16,18 @@
       "type": "string",
       "default": "https://chat.smarts.bio"
     },
+    "searchApiUrl": {
+      "title": "Bio Search API URL",
+      "description": "URL of the smarts.bio bio-search API (advanced — do not change unless directed by support)",
+      "type": "string",
+      "default": "https://tools.smarts.bio"
+    },
+    "biographApiUrl": {
+      "title": "Biograph API URL",
+      "description": "URL of the smarts.bio biograph service (advanced — do not change unless directed by support)",
+      "type": "string",
+      "default": "https://biograph.smarts.bio"
+    },
     "defaultWorkspaceId": {
       "title": "Default Workspace ID",
       "description": "Default workspace ID (auto-populated after sign-in)",

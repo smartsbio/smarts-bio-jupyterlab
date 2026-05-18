@@ -3,6 +3,7 @@ import {
   JupyterFrontEndPlugin,
 } from '@jupyterlab/application';
 import { ICommandPalette } from '@jupyterlab/apputils';
+import { ILauncher } from '@jupyterlab/launcher';
 import { Widget } from '@lumino/widgets';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { IStateDB } from '@jupyterlab/statedb';
@@ -15,6 +16,8 @@ import { SmartsBioClient } from './api/SmartsBioClient';
 import { WorkspaceSelector } from './workspace/WorkspaceSelector';
 import { ChatWidget } from './widgets/ChatWidget';
 import { ExplorerWidget } from './widgets/ExplorerWidget';
+import { BioSearchWidget } from './widgets/BioSearchWidget';
+import { GraphExplorerWidget } from './widgets/GraphExplorerWidget';
 import { createJupyterCapabilities } from './capabilities';
 import { CellInserter } from './notebook/CellInserter';
 import { CellContextProvider } from './notebook/CellContextProvider';
@@ -24,13 +27,14 @@ import { ViewerWidgetFactory, LOCAL_BINARY_EXTS } from './viewers/ViewerWidgetFa
 import { openViewerWidget } from './viewers/ViewerWidget';
 import { Base64ModelFactory } from '@jupyterlab/docregistry';
 import { LabIcon } from '@jupyterlab/ui-components';
-import { smartsBioIcon } from './icons';
+import { smartsBioIcon, bioSearchIcon, graphExplorerIcon } from './icons';
 import {
   sequenceLabIcon,
   alignmentLabIcon,
   variantLabIcon,
   structureLabIcon,
   moleculeLabIcon,
+  treeLabIcon,
   xprLabIcon,
   tabularLabIcon,
   xlsxLabIcon,
@@ -50,6 +54,7 @@ const BIOINFORMATICS_EXTENSIONS = [
   '.vcf', '.bcf', '.bed',
   '.csv', '.tsv', '.xlsx', '.xls',
   '.mol', '.sdf', '.mol2', '.xyz', '.smi', '.smiles', '.inchi',
+  '.nwk', '.tree', '.phy', '.tre', '.newick',
   '.xpr',
   '.md', '.docx', '.pdf',
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.tif', '.tiff', '.bmp',
@@ -64,6 +69,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   optional: [
     ISettingRegistry,
     ICommandPalette,
+    ILauncher,
     IStatusBar,
     INotebookTracker,
   ],
@@ -72,6 +78,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     stateDB: IStateDB,
     settingRegistry: ISettingRegistry | null,
     palette: ICommandPalette | null,
+    launcher: ILauncher | null,
     statusBar: IStatusBar | null,
     notebookTracker: INotebookTracker | null,
   ) => {
@@ -81,13 +88,19 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const config = {
       apiBaseUrl: 'https://api.smarts.bio',
       websiteBaseUrl: 'https://chat.smarts.bio',
+      searchApiUrl: 'https://tools.smarts.bio',
+      biographApiUrl: 'https://biograph.smarts.bio',
     };
     if (settingRegistry) {
       settingRegistry.load(PLUGIN_ID).then(settings => {
         const api = settings.get('apiBaseUrl').composite as string;
         const web = settings.get('websiteBaseUrl').composite as string;
+        const search = settings.get('searchApiUrl').composite as string;
+        const biograph = settings.get('biographApiUrl').composite as string;
         if (api) config.apiBaseUrl = api;
         if (web) config.websiteBaseUrl = web;
+        if (search) config.searchApiUrl = search;
+        if (biograph) config.biographApiUrl = biograph;
       }).catch(() => {/* use defaults */});
     }
     const getConfig = () => config;
@@ -131,6 +144,45 @@ const plugin: JupyterFrontEndPlugin<void> = {
     explorerWidget.title.icon = smartsBioIcon;
     explorerWidget.title.caption = 'smarts.bio Files & Processes';
 
+    // Bio Search and Graph Explorer — open as main-area tabs on demand
+    let bioSearchWidget: BioSearchWidget | null = null;
+    let graphExplorerWidget: GraphExplorerWidget | null = null;
+
+    function getOrCreateBioSearch(initialQuery?: string): BioSearchWidget {
+      if (!bioSearchWidget || bioSearchWidget.isDisposed) {
+        bioSearchWidget = new BioSearchWidget(client, {
+          initialQuery,
+          onOpenInGraph: (entity) => {
+            const gw = getOrCreateGraphExplorer(entity);
+            if (!gw.isAttached) app.shell.add(gw, 'main');
+            app.shell.activateById(gw.id);
+          },
+          onAskInChat: (message) => {
+            app.shell.activateById(chatWidget.id);
+            chatWidget.sendMessage(message);
+          },
+        });
+        bioSearchWidget.id = 'smarts-bio-biosearch';
+        bioSearchWidget.title.label = 'Bio Search';
+        bioSearchWidget.title.closable = true;
+      } else if (initialQuery) {
+        bioSearchWidget.setQuery(initialQuery);
+      }
+      return bioSearchWidget;
+    }
+
+    function getOrCreateGraphExplorer(initialEntity?: { id: string; type: string }): GraphExplorerWidget {
+      if (!graphExplorerWidget || graphExplorerWidget.isDisposed) {
+        graphExplorerWidget = new GraphExplorerWidget(client, { initialEntity });
+        graphExplorerWidget.id = 'smarts-bio-graphexplorer';
+        graphExplorerWidget.title.label = 'Graph Explorer';
+        graphExplorerWidget.title.closable = true;
+      } else if (initialEntity) {
+        graphExplorerWidget.navigateTo(initialEntity);
+      }
+      return graphExplorerWidget;
+    }
+
     // Chat in right sidebar; Explorer (Files + Processes) in left sidebar
     app.shell.add(chatWidget, 'right', { rank: 400 });
     app.shell.add(explorerWidget, 'left', { rank: 401 });
@@ -168,6 +220,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         '.pdb': structureLabIcon, '.ent': structureLabIcon, '.cif': structureLabIcon, '.mmcif': structureLabIcon,
         '.mol': moleculeLabIcon, '.sdf': moleculeLabIcon, '.mol2': moleculeLabIcon,
         '.xyz': moleculeLabIcon, '.smi': moleculeLabIcon, '.smiles': moleculeLabIcon, '.inchi': moleculeLabIcon,
+        '.nwk': treeLabIcon, '.tree': treeLabIcon, '.phy': treeLabIcon, '.tre': treeLabIcon, '.newick': treeLabIcon,
         '.csv': tabularLabIcon, '.tsv': tabularLabIcon,
         '.xlsx': xlsxLabIcon, '.xls': xlsxLabIcon,
         '.xpr': xprLabIcon,
@@ -263,7 +316,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // Panel navigation
     commands.addCommand('smarts-bio:open-chat', {
-      label: 'smarts.bio: Open Chat',
+      label: 'Agent Chat',
+      caption: 'Ask the smarts.bio AI assistant',
+      icon: smartsBioIcon,
       execute: () => {
         app.shell.activateById(chatWidget.id);
       },
@@ -469,6 +524,51 @@ const plugin: JupyterFrontEndPlugin<void> = {
       },
     });
 
+    commands.addCommand('smarts-bio:open-bio-search', {
+      label: 'Bio Search',
+      caption: 'Search genes, proteins, sequences, diseases and more',
+      icon: bioSearchIcon,
+      execute: () => {
+        const w = getOrCreateBioSearch();
+        if (!w.isAttached) app.shell.add(w, 'main');
+        app.shell.activateById(w.id);
+      },
+    });
+
+    commands.addCommand('smarts-bio:search-selection', {
+      label: 'smarts.bio: Search Selection in Bio Search',
+      execute: () => {
+        const ctx = cellContextProvider.getActiveCellContext();
+        const query = ctx?.content?.trim();
+        const w = getOrCreateBioSearch(query);
+        if (!w.isAttached) app.shell.add(w, 'main');
+        app.shell.activateById(w.id);
+      },
+    });
+
+    commands.addCommand('smarts-bio:open-graph-explorer', {
+      label: 'Graph Explorer',
+      caption: 'Explore the biological knowledge graph',
+      icon: graphExplorerIcon,
+      execute: () => {
+        const w = getOrCreateGraphExplorer();
+        if (!w.isAttached) app.shell.add(w, 'main');
+        app.shell.activateById(w.id);
+      },
+    });
+
+    commands.addCommand('smarts-bio:explore-selection', {
+      label: 'smarts.bio: Explore Selection in Graph Explorer',
+      execute: () => {
+        const ctx = cellContextProvider.getActiveCellContext();
+        const id = ctx?.content?.trim();
+        const entity = id ? { id, type: 'auto' } : undefined;
+        const w = getOrCreateGraphExplorer(entity);
+        if (!w.isAttached) app.shell.add(w, 'main');
+        app.shell.activateById(w.id);
+      },
+    });
+
     // ── Jupyter-only commands ─────────────────────────────────────────────────
 
     commands.addCommand('smarts-bio:analyze-cell', {
@@ -503,6 +603,25 @@ const plugin: JupyterFrontEndPlugin<void> = {
       },
     });
 
+    // ── Launcher cards ────────────────────────────────────────────────────────
+    if (launcher) {
+      launcher.add({
+        command: 'smarts-bio:open-bio-search',
+        category: 'smarts.bio',
+        rank: 1,
+      });
+      launcher.add({
+        command: 'smarts-bio:open-graph-explorer',
+        category: 'smarts.bio',
+        rank: 2,
+      });
+      launcher.add({
+        command: 'smarts-bio:open-chat',
+        category: 'smarts.bio',
+        rank: 0,
+      });
+    }
+
     // ── Command palette entries ───────────────────────────────────────────────
     if (palette) {
       const category = 'smarts.bio';
@@ -519,6 +638,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
         'smarts-bio:refresh-files',
         'smarts-bio:analyze-cell',
         'smarts-bio:attach-kernel-context',
+        'smarts-bio:open-bio-search',
+        'smarts-bio:search-selection',
+        'smarts-bio:open-graph-explorer',
+        'smarts-bio:explore-selection',
       ].forEach(command => palette.addItem({ command, category }));
     }
 

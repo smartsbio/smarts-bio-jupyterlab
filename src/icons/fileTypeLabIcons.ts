@@ -20,6 +20,7 @@ export const xlsxLabIcon      = labIcon('xlsx',      'xlsx');
 export const textLabIcon      = labIcon('text',      'md');
 export const pdfLabIcon       = labIcon('pdf',       'pdf');
 export const imageLabIcon     = labIcon('image',     'png');
+export const treeLabIcon      = labIcon('tree',      'nwk');
 export const codeLabIcon      = labIcon('code',      'py');
 export const jsonLabIcon      = labIcon('json',      'json');
 export const dataLabIcon      = labIcon('data',      'yaml');
