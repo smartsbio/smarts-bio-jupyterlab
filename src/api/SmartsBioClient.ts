@@ -842,10 +842,6 @@ export class SmartsBioClient {
 
   // ── Graph Explorer ──────────────────────────────────────────────────────────
 
-  private getBiographApiBase(): string {
-    return this.getConfig().biographApiUrl ?? 'http://localhost:3030';
-  }
-
   async getGraphNetwork(params: {
     entity: string;
     type: string;
@@ -854,32 +850,19 @@ export class SmartsBioClient {
     nodeTypes?: string[];
   }): Promise<unknown> {
     const qs = new URLSearchParams({
+      entity: params.entity,
+      type: params.type,
       depth: String(params.depth),
       limit: String(params.limit ?? 50),
     });
     if (params.nodeTypes && params.nodeTypes.length > 0) {
       qs.set('nodeTypes', params.nodeTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(','));
     }
-    const url = `${this.getBiographApiBase()}/api/v1/network/${encodeURIComponent(params.type)}/${encodeURIComponent(params.entity)}?${qs}`;
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
-      throw new Error(body.message ?? body.error ?? `Network request failed (${res.status})`);
-    }
-    return res.json();
+    return this.request<unknown>('GET', `/v1/graph/network?${qs}`);
   }
 
   async getEntityDetail(entityType: string, entityId: string): Promise<unknown> {
-    const COLLECTION: Record<string, string> = {
-      gene: 'genes', protein: 'proteins', variant: 'variants',
-      disease: 'diseases', pathway: 'pathways', drug: 'drugs',
-      conserved_domain: 'conserved_domains',
-    };
-    const collection = COLLECTION[entityType.toLowerCase()] ?? entityType;
-    const url = `${this.getBiographApiBase()}/api/v1/${collection}/${encodeURIComponent(entityId)}`;
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
-    if (!res.ok) throw new Error(`Entity detail failed: ${res.status}`);
-    return res.json();
+    return this.request<unknown>('GET', `/v1/graph/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
   }
 }
 
