@@ -1797,7 +1797,7 @@ __metadata:
     "@jupyterlab/statusbar": ^4.0.0
     "@jupyterlab/ui-components": ^4.0.0
     "@lumino/widgets": ^2.0.0
-    "@smartsbio/ui": ^0.1.19
+    "@smartsbio/ui": ^0.1.21
     "@types/react": ^18.2.0
     "@types/react-dom": ^18.2.0
     marked: ^17.0.4
@@ -1814,9 +1814,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@smartsbio/ui@npm:^0.1.19":
-  version: 0.1.19
-  resolution: "@smartsbio/ui@npm:0.1.19::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40smartsbio%2Fui%2F0.1.19%2F26bd6acd614d95339f508ce78707c28947519737"
+"@smartsbio/ui@npm:^0.1.21":
+  version: 0.1.21
+  resolution: "@smartsbio/ui@npm:0.1.21::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40smartsbio%2Fui%2F0.1.21%2Ff36b7f2e29901c8187931bd86fd2a4c444db8db2"
   dependencies:
     "@types/cytoscape": ^3.21.9
     cytoscape: ^3.33.3
@@ -1829,7 +1829,7 @@ __metadata:
   peerDependencies:
     react: ">=18.0.0"
     react-dom: ">=18.0.0"
-  checksum: c4f79153ba1d079e8ca6290d16bc4e6553040a8ad46d23060496ace76f2e6dfb5917665e8b5c3e164770c3c3eafbae719443db6c6f7d1e848f8c0f8be74dd8a8
+  checksum: 6f7ffc6f42956ce5f2311788b2e4e644b673e37b7cfe96ea306fdd07000c733a3c420273e7796b18fd02602c1341993a4d89a4b60cd978a835d29a01249b0b4d
   languageName: node
   linkType: hard
 

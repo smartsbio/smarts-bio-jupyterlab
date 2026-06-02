@@ -41,6 +41,9 @@ import {
   textLabIcon,
   pdfLabIcon,
   imageLabIcon,
+  wsiLabIcon,
+  dicomLabIcon,
+  goaLabIcon,
 } from './icons/fileTypeLabIcons';
 
 const PLUGIN_ID = '@smartsbio/jupyterlab-extension:plugin';
@@ -48,7 +51,8 @@ const PLUGIN_ID = '@smartsbio/jupyterlab-extension:plugin';
 // File types handled by the custom viewer factory
 const BIOINFORMATICS_EXTENSIONS = [
   '.fasta', '.fa', '.fna', '.ffn', '.faa', '.frn', '.fastq', '.fq',
-  '.gb', '.gbk', '.genbank',
+  '.gb', '.gbk', '.gbff', '.genbank',
+  '.goa', '.gaf',
   '.pdb', '.ent', '.cif', '.mmcif',
   '.sam', '.bam', '.cram', '.bai',
   '.vcf', '.bcf', '.bed',
@@ -59,6 +63,10 @@ const BIOINFORMATICS_EXTENSIONS = [
   '.md', '.docx', '.pdf',
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.tif', '.tiff', '.bmp',
   '.bw', '.bigwig',
+  // Whole Slide Images — tile-server required; opened from smarts.bio workspace
+  '.svs', '.ndpi', '.scn', '.mrxs', '.vms', '.vmu', '.bif',
+  // DICOM medical imaging
+  '.dcm', '.dicom',
 ];
 
 const plugin: JupyterFrontEndPlugin<void> = {
@@ -90,6 +98,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       websiteBaseUrl: 'https://chat.smarts.bio',
       searchApiUrl: 'https://tools.smarts.bio',
       biographApiUrl: 'https://biograph.smarts.bio',
+      analyticsUrl: 'https://analytics.smarts.bio',
     };
     if (settingRegistry) {
       settingRegistry.load(PLUGIN_ID).then(settings => {
@@ -97,10 +106,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const web = settings.get('websiteBaseUrl').composite as string;
         const search = settings.get('searchApiUrl').composite as string;
         const biograph = settings.get('biographApiUrl').composite as string;
+        const analytics = settings.get('analyticsUrl').composite as string;
         if (api) config.apiBaseUrl = api;
         if (web) config.websiteBaseUrl = web;
         if (search) config.searchApiUrl = search;
         if (biograph) config.biographApiUrl = biograph;
+        if (analytics) config.analyticsUrl = analytics;
       }).catch(() => {/* use defaults */});
     }
     const getConfig = () => config;
@@ -214,7 +225,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
         '.fasta': sequenceLabIcon, '.fa': sequenceLabIcon, '.fna': sequenceLabIcon,
         '.ffn': sequenceLabIcon, '.faa': sequenceLabIcon, '.frn': sequenceLabIcon,
         '.fastq': sequenceLabIcon, '.fq': sequenceLabIcon,
-        '.gb': sequenceLabIcon, '.gbk': sequenceLabIcon, '.genbank': sequenceLabIcon,
+        '.gb': sequenceLabIcon, '.gbk': sequenceLabIcon, '.gbff': sequenceLabIcon, '.genbank': sequenceLabIcon,
+        '.goa': goaLabIcon, '.gaf': goaLabIcon,
         '.bam': alignmentLabIcon, '.sam': alignmentLabIcon, '.cram': alignmentLabIcon, '.bai': alignmentLabIcon,
         '.vcf': variantLabIcon, '.bcf': variantLabIcon, '.bed': variantLabIcon,
         '.pdb': structureLabIcon, '.ent': structureLabIcon, '.cif': structureLabIcon, '.mmcif': structureLabIcon,
@@ -227,6 +239,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
         '.md': textLabIcon, '.docx': textLabIcon, '.pdf': pdfLabIcon,
         '.png': imageLabIcon, '.jpg': imageLabIcon, '.jpeg': imageLabIcon, '.gif': imageLabIcon,
         '.webp': imageLabIcon, '.svg': imageLabIcon, '.tif': imageLabIcon, '.tiff': imageLabIcon, '.bmp': imageLabIcon,
+        '.svs': wsiLabIcon, '.ndpi': wsiLabIcon, '.scn': wsiLabIcon, '.mrxs': wsiLabIcon,
+        '.vms': wsiLabIcon, '.vmu': wsiLabIcon, '.bif': wsiLabIcon,
+        '.dcm': dicomLabIcon, '.dicom': dicomLabIcon,
       };
 
       // Register bioinformatics file types with per-type icons

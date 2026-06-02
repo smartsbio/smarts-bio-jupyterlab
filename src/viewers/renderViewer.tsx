@@ -10,14 +10,21 @@ import {
   DocumentViewer,
   PdfViewer,
   ImageViewer,
+  DicomViewer,
   ChartViewer,
   ExperimentViewer,
   TreeViewer,
+  GenBankViewer,
+  GoaViewer,
+  WsiViewer,
   SmartsBioProvider,
   ViewerShell,
 } from '@smartsbio/ui';
+import type { WsiMeta } from '@smartsbio/ui';
 
 export const SEQUENCE_EXTS    = new Set(['.fasta', '.fa', '.fna', '.ffn', '.faa', '.frn', '.fastq', '.fq']);
+export const GENBANK_EXTS     = new Set(['.gb', '.gbk', '.gbff', '.genbank']);
+export const GOA_EXTS         = new Set(['.goa', '.gaf']);
 export const EXPERIMENT_EXTS  = new Set(['.xpr']);
 export const STRUCTURE_EXTS = new Set(['.pdb', '.cif', '.mmcif']);
 export const ALIGNMENT_EXTS = new Set(['.sam', '.bam']);
@@ -30,6 +37,10 @@ export const PDF_EXTS       = new Set(['.pdf']);
 export const IMAGE_EXTS     = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.tif', '.tiff', '.bmp', '.ico']);
 /** Formats that have no viewer — too binary/compressed to display meaningfully. */
 export const BINARY_EXTS    = new Set(['.cram', '.bcf', '.bw', '.bigwig']);
+/** Whole Slide Images — tile-server required, never downloaded directly. */
+export const WSI_EXTS       = new Set(['.svs', '.ndpi', '.scn', '.mrxs', '.vms', '.vmu', '.bif']);
+/** DICOM medical imaging files — fetched as binary and rendered by DicomViewer. */
+export const DICOM_EXTS     = new Set(['.dcm', '.dicom']);
 
 export function detectIsDark(): boolean {
   return document.body.getAttribute('data-jp-theme-light') !== 'true';
@@ -46,10 +57,18 @@ interface ViewerProps {
   workspaceId?: string;
   isAuthenticated?: boolean;
   onExportPdf?: (markdown: string, title: string) => Promise<void>;
+  /** WsiViewer: called with the presigned file URL; returns WsiMeta from bio-analytics. */
+  onOpenFile?: (fileUrl: string) => Promise<WsiMeta>;
+  /** WsiViewer: direct URL of the bio-analytics tile server (no auth needed for tiles). */
+  tileServerUrl?: string;
+  /** WsiViewer: presigned S3 URL for the WSI file — passed as fileUrl prop. */
+  fileUrl?: string;
 }
 
 /** Map file extension to the viewerType expected by bio-analytics. */
 export function extToViewerType(ext: string): string {
+  if (GENBANK_EXTS.has(ext))    return 'genbank';
+  if (GOA_EXTS.has(ext))        return 'goa';
   if (SEQUENCE_EXTS.has(ext))   return 'sequence';
   if (STRUCTURE_EXTS.has(ext))  return 'structure';
   if (ALIGNMENT_EXTS.has(ext))  return 'alignment';
@@ -60,6 +79,8 @@ export function extToViewerType(ext: string): string {
   if (DOCUMENT_EXTS.has(ext))   return 'document';
   if (PDF_EXTS.has(ext))        return 'pdf';
   if (IMAGE_EXTS.has(ext))      return 'image';
+  if (WSI_EXTS.has(ext))        return 'wsi';
+  if (DICOM_EXTS.has(ext))      return 'dicom';
   return 'text';
 }
 
@@ -68,11 +89,13 @@ export function renderViewer(
   fileName: string,
   ext: string,
   content: string | Uint8Array,
-  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf }: ViewerProps = {},
+  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, tileServerUrl, fileUrl }: ViewerProps = {},
 ): React.ReactElement {
   const isDark = detectIsDark();
   const shared = { fileContent: content, fileName, isDark, onSave, onDownload, onUpload, onAnalyze: onAnalyze as any };
 
+  if (GENBANK_EXTS.has(ext))     return <GenBankViewer   {...shared} />;
+  if (GOA_EXTS.has(ext))         return <GoaViewer        {...shared} />;
   if (SEQUENCE_EXTS.has(ext))    return <SequenceViewer  {...shared} />;
   if (STRUCTURE_EXTS.has(ext))   return <StructureViewer {...shared} />;
   if (ALIGNMENT_EXTS.has(ext))   return <AlignmentViewer {...shared} />;
@@ -83,6 +106,23 @@ export function renderViewer(
   if (DOCUMENT_EXTS.has(ext))    return <DocumentViewer  {...shared} />;
   if (PDF_EXTS.has(ext))         return <PdfViewer       fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
   if (IMAGE_EXTS.has(ext))       return <ImageViewer     fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
+  if (DICOM_EXTS.has(ext))       return <DicomViewer     fileContent={content as Uint8Array} fileName={fileName} isDark={isDark} onDownload={onDownload} />;
+
+  // WSI: tile-server based viewer — never uses file content, needs presigned URL + tile server.
+  // When opened from a workspace, fileUrl is the presigned S3 URL and onOpenFile calls bio-analytics
+  // to register the slide and return WsiMeta (wsi_id). Without a workspace (local files), the
+  // viewer renders with an empty fileUrl and shows a "workspace required" state.
+  if (WSI_EXTS.has(ext)) {
+    return (
+      <WsiViewer
+        fileUrl={fileUrl ?? ''}
+        onOpenFile={onOpenFile ?? (async () => ({} as WsiMeta))}
+        tileServerUrl={tileServerUrl ?? ''}
+        isDark={isDark}
+        fileName={fileName}
+      />
+    );
+  }
 
   // Vega-Lite chart: detected by caller via $schema inspection
   if (ext === '.chart') return <ChartViewer fileContent={content as string} fileName={fileName} isDark={isDark} onSave={onSave} onDownload={onDownload} onResolveRef={onResolveRef} onListFiles={onListFiles} makeFileUrl={makeFileUrl} />;

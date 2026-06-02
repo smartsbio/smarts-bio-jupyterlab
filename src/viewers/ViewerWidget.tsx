@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReactWidget, MainAreaWidget } from '@jupyterlab/apputils';
 import { ViewerShell } from '@smartsbio/ui';
+import type { WsiMeta } from '@smartsbio/ui';
 import { SmartsBioClient } from '../api/SmartsBioClient';
 import {
   BINARY_EXTS,
+  WSI_EXTS,
   detectIsDark,
   extToViewerType,
   renderViewer,
@@ -55,9 +57,31 @@ function RemoteViewerPane({
   const [error, setError]     = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [effectiveExt, setEffectiveExt] = useState(ext);
+  // WSI: resolved all at once — presigned URL, WsiMeta (for onOpenFile cache), and the
+  // tile server URL the API gateway actually used (may differ from analyticsUrl setting).
+  const [wsiData, setWsiData] = useState<{ fileUrl: string; meta: WsiMeta; tileServerUrl: string } | null>(null);
   const isDark = detectIsDark();
 
   useEffect(() => {
+    // WSI files are 2-20 GB — never download. Fetch the presigned URL and open the slide
+    // in parallel. The wsiOpen response includes tile_server_url which tells us which
+    // bio-analytics instance holds this wsi_id (critical: must match for tiles to render).
+    if (WSI_EXTS.has(ext)) {
+      Promise.all([
+        client.getFileDownloadUrl(workspaceId, fileKey),
+        client.wsiOpen(fileKey, workspaceId),
+      ]).then(([fileUrl, result]) => {
+        const tileServerUrl = (typeof result.tile_server_url === 'string' ? result.tile_server_url : '')
+          .replace(/\/$/, '') || client.getAnalyticsBase();
+        setWsiData({ fileUrl, meta: result as unknown as WsiMeta, tileServerUrl });
+        setProgress(null);
+      }).catch(err => {
+        setError(err instanceof Error ? err.message : String(err));
+        setProgress(null);
+      });
+      return;
+    }
+
     if (BINARY_EXTS.has(ext)) {
       setError(
         `${fileName} is a binary compressed format and cannot be previewed inline.\n` +
@@ -66,7 +90,7 @@ function RemoteViewerPane({
       return;
     }
 
-    const asBinary = ext === '.bam' || ext === '.xlsx' || ext === '.xls' || ext === '.pdf' || ext === '.docx' || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.webp' || ext === '.tif' || ext === '.tiff' || ext === '.bmp' || ext === '.ico' || ext === '.svg';
+    const asBinary = ext === '.bam' || ext === '.xlsx' || ext === '.xls' || ext === '.pdf' || ext === '.docx' || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.gif' || ext === '.webp' || ext === '.tif' || ext === '.tiff' || ext === '.bmp' || ext === '.ico' || ext === '.svg' || ext === '.dcm' || ext === '.dicom';
     setProgress(0);
 
     // The API proxy buffers the full response, so real chunk-level progress isn't
@@ -220,7 +244,25 @@ function RemoteViewerPane({
     return client.streamAnalysis(fileKey, viewerType, workspaceId, parameters);
   }, [client, fileKey, viewerType, workspaceId]);
 
+  // WsiViewer calls onOpenFile(fileUrl) when mounted. We return the already-fetched
+  // WsiMeta from wsiData to avoid a second API call. The meta includes the wsi_id
+  // that WsiViewer uses together with tileServerUrl to construct tile URLs.
+  const onOpenWsiFile = useCallback(async (_fileUrl: string): Promise<WsiMeta> => {
+    return wsiData!.meta;
+  }, [wsiData]);
+
   if (error)            return <ViewerShell error={error} isDark={isDark} />;
+
+  // WSI: wait for both presigned URL and wsiOpen to resolve before rendering.
+  if (WSI_EXTS.has(ext)) {
+    if (!wsiData) return <ViewerShell loading isDark={isDark} />;
+    return renderViewer(fileName, ext, '', {
+      fileUrl: wsiData.fileUrl,
+      onOpenFile: onOpenWsiFile,
+      tileServerUrl: wsiData.tileServerUrl,
+    });
+  }
+
   if (content === null) return <DownloadProgress progress={progress} isDark={isDark} />;
 
   // Only offer save for text-based files (not BAM Uint8Array)

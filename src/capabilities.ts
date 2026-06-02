@@ -265,6 +265,11 @@ export function createJupyterCapabilities(
       }
     },
 
+    moveFile: async (workspaceId, sourceKey, destFolderPath) => {
+      await client.moveFile(workspaceId, sourceKey, destFolderPath);
+      callbacks.refreshFiles();
+    },
+
     onNewFileRequest: async (folderPath) => {
       const workspaceId = auth.profile?.defaultWorkspaceId ?? '';
       if (!workspaceId) return;

@@ -82,7 +82,7 @@ export interface WorkspaceFileItem {
   format?: string;
 }
 
-export type ConfigGetter = () => { apiBaseUrl: string; searchApiUrl?: string; biographApiUrl?: string };
+export type ConfigGetter = () => { apiBaseUrl: string; searchApiUrl?: string; biographApiUrl?: string; analyticsUrl?: string };
 
 /**
  * All smarts.bio API communication lives here.
@@ -822,6 +822,10 @@ export class SmartsBioClient {
 
   // ── Bio Search ──────────────────────────────────────────────────────────────
 
+  getAnalyticsBase(): string {
+    return (this.getConfig().analyticsUrl ?? 'https://analytics.smarts.bio').replace(/\/$/, '');
+  }
+
   private getSearchApiBase(): string {
     return this.getConfig().searchApiUrl ?? 'http://localhost:3020';
   }
@@ -863,6 +867,18 @@ export class SmartsBioClient {
 
   async getEntityDetail(entityType: string, entityId: string): Promise<unknown> {
     return this.request<unknown>('GET', `/v1/graph/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
+  }
+
+  // ── WSI / Whole Slide Image ─────────────────────────────────────────────────
+
+  /**
+   * Open a WSI slide on bio-analytics via the API gateway and return WsiMeta.
+   * The gateway resolves fileKey+workspaceId to a presigned S3 URL and forwards
+   * it to bio-analytics /wsi/open. The returned wsi_id can then be used to fetch
+   * tiles directly from the tile server at getAnalyticsBase()/wsi/tile/...
+   */
+  async wsiOpen(fileKey: string, workspaceId: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>('POST', '/v1/analytics/wsi/open', { fileKey, workspaceId });
   }
 }
 

@@ -28,6 +28,12 @@
       "type": "string",
       "default": "https://biograph.smarts.bio"
     },
+    "analyticsUrl": {
+      "title": "Bio-Analytics URL",
+      "description": "URL of the bio-analytics tile server used for Whole Slide Image viewing. Set to http://localhost:3023 when running bio-analytics locally.",
+      "type": "string",
+      "default": "https://analytics.smarts.bio"
+    },
     "defaultWorkspaceId": {
       "title": "Default Workspace ID",
       "description": "Default workspace ID (auto-populated after sign-in)",

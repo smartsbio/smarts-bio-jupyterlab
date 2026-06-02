@@ -4,7 +4,7 @@
 import React from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
 import { ChatApp, ChatAction } from '@smartsbio/ui';
-import type { ContextAttachment, SlashItem } from '@smartsbio/ui';
+import type { ChatMessage, ContextAttachment, SlashItem } from '@smartsbio/ui';
 import { AuthProvider } from '../auth/AuthProvider';
 import { SmartsBioClient } from '../api/SmartsBioClient';
 import { WorkspaceSelector } from '../workspace/WorkspaceSelector';
@@ -191,6 +191,16 @@ export class ChatWidget extends ReactWidget {
     }
   }
 
+  private async _handleDownloadChat(messages: ChatMessage[]): Promise<void> {
+    const workspaceId = this._getWorkspaceId();
+    if (!workspaceId || messages.length === 0) return;
+    const markdown = messages.map(m =>
+      `## ${m.role === 'user' ? 'User' : 'Assistant'}\n\n${m.content}`
+    ).join('\n\n');
+    const title = messages[0]?.content.split('\n')[0].replace(/^#+\s*/, '').slice(0, 80) || 'Chat Export';
+    await this.client.generatePdf(workspaceId, markdown, title);
+  }
+
   private async _handleFetchSlashCatalog(): Promise<void> {
     try {
       const catalog = await this.client.getCatalog();
@@ -235,6 +245,7 @@ export class ChatWidget extends ReactWidget {
         }}
         onFetchFiles={(path) => { void this._handleFetchFiles(path); }}
         onConfirmScript={(threadId) => { void this._handleConfirmScript(threadId); }}
+        onDownloadChat={(messages) => this._handleDownloadChat(messages)}
         insertLabel="Insert ↓"
       />
     );

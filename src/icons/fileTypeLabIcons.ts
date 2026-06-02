@@ -25,3 +25,6 @@ export const codeLabIcon      = labIcon('code',      'py');
 export const jsonLabIcon      = labIcon('json',      'json');
 export const dataLabIcon      = labIcon('data',      'yaml');
 export const zipLabIcon       = labIcon('zip',       'gz');
+export const wsiLabIcon       = labIcon('wsi',   'svs');
+export const dicomLabIcon     = labIcon('dicom', 'dcm');
+export const goaLabIcon       = labIcon('goa',   'goa');

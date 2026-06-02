@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
 import { ABCWidgetFactory, DocumentRegistry, DocumentWidget } from '@jupyterlab/docregistry';
 import { ViewerShell } from '@smartsbio/ui';
-import { detectIsDark, renderViewer, extToViewerType } from './renderViewer';
+import { detectIsDark, renderViewer, extToViewerType, WSI_EXTS } from './renderViewer';
 import type { SmartsBioClient } from '../api/SmartsBioClient';
 import type { AuthProvider } from '../auth/AuthProvider';
 
@@ -24,6 +24,8 @@ export const LOCAL_BINARY_EXTS = new Set([
   '.bam', '.bai', '.cram',
   // Variant / signal tracks
   '.bcf', '.bw', '.bigwig',
+  // DICOM medical imaging
+  '.dcm', '.dicom',
 ]);
 
 function base64ToUint8Array(b64: string): Uint8Array {
@@ -35,6 +37,51 @@ function base64ToUint8Array(b64: string): Uint8Array {
 
 // ── Local viewer pane ─────────────────────────────────────────────────────────
 
+function WsiLocalMessage({
+  isDark,
+  isAuthenticated,
+  onSignIn,
+}: {
+  isDark: boolean;
+  isAuthenticated: boolean;
+  onSignIn?: () => void;
+}): React.ReactElement {
+  const bg  = isDark ? '#1e1e1e' : '#f9f9f9';
+  const fg  = isDark ? '#e0e0e0' : '#333';
+  const sub = isDark ? '#aaa'    : '#666';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: bg, padding: '0 32px', gap: 10, textAlign: 'center' }}>
+      <div style={{ fontSize: 36 }}>🔬</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: fg }}>Whole Slide Image</div>
+      <div style={{ fontSize: 13, color: sub, maxWidth: 440, lineHeight: 1.6 }}>
+        WSI files are too large to open locally and require a tile server to render.
+      </div>
+      {!isAuthenticated ? (
+        <>
+          <div style={{ fontSize: 13, color: sub, maxWidth: 440, lineHeight: 1.6 }}>
+            Sign in, then drag this file into the <strong>smarts.bio File Explorer</strong> to upload and open it.
+          </div>
+          <button
+            onClick={onSignIn}
+            style={{
+              marginTop: 4, padding: '8px 20px', fontSize: 13, fontWeight: 600,
+              background: 'var(--jp-brand-color1, #1976d2)', color: '#fff',
+              border: 'none', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            Sign in to smarts.bio
+          </button>
+        </>
+      ) : (
+        <div style={{ fontSize: 13, color: sub, maxWidth: 440, lineHeight: 1.8, textAlign: 'left' }}>
+          <div>1. Drag this file into the <strong>smarts.bio File Explorer</strong> (left sidebar) to upload it.</div>
+          <div>2. Once uploaded, click the file in the Explorer to open the viewer.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LocalViewerPane({
   fileName,
   ext,
@@ -43,6 +90,7 @@ function LocalViewerPane({
   saveContent,
   onAnalyze,
   onCommand,
+  isAuthenticated,
 }: {
   fileName: string;
   ext: string;
@@ -51,12 +99,18 @@ function LocalViewerPane({
   saveContent: ((text: string) => Promise<void>) | null;
   onAnalyze?: (...args: unknown[]) => AsyncIterable<{ event: string; data: Record<string, unknown> }>;
   onCommand?: (cmd: string) => void;
+  isAuthenticated: boolean;
 }): React.ReactElement {
   const [content, setContent] = useState<string | Uint8Array | null>(null);
   const [error, setError]     = useState<string | null>(null);
   const isDark = detectIsDark();
 
+  // WSI: tile-server based — never read local file content (files are 2-20 GB).
+  // The viewer renders with an empty fileUrl and shows a "workspace required" state.
+  const isWsi = WSI_EXTS.has(ext);
+
   useEffect(() => {
+    if (isWsi) return;
     let cancelled = false;
     contentPromise
       .then(raw => {
@@ -65,7 +119,7 @@ function LocalViewerPane({
       })
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [contentPromise, isBinary]);
+  }, [contentPromise, isBinary, isWsi]);
 
   const handleSave = useCallback(async (edited: string) => {
     if (!saveContent) return;
@@ -88,6 +142,18 @@ function LocalViewerPane({
   }, [onCommand]);
 
   if (error)            return <ViewerShell error={error} isDark={isDark} />;
+
+  // WSI local: never downloadable — show an informative message instead.
+  if (isWsi) {
+    return (
+      <WsiLocalMessage
+        isDark={isDark}
+        isAuthenticated={isAuthenticated}
+        onSignIn={onCommand ? () => onCommand('sign-in') : undefined}
+      />
+    );
+  }
+
   if (content === null) return <ViewerShell loading       isDark={isDark} />;
 
   return (
@@ -103,31 +169,34 @@ function LocalViewerPane({
 // ── ReactWidget wrapper ────────────────────────────────────────────────────────
 
 class LocalViewerWidget extends ReactWidget {
-  private _fileName:       string;
-  private _ext:            string;
-  private _isBinary:       boolean;
-  private _contentPromise: Promise<string>;
-  private _saveContent:    ((text: string) => Promise<void>) | null;
-  private _onAnalyze:      ((...args: unknown[]) => AsyncIterable<{ event: string; data: Record<string, unknown> }>) | undefined;
-  private _onCommand:      ((cmd: string) => void) | undefined;
+  private _fileName:        string;
+  private _ext:             string;
+  private _isBinary:        boolean;
+  private _contentPromise:  Promise<string>;
+  private _saveContent:     ((text: string) => Promise<void>) | null;
+  private _onAnalyze:       ((...args: unknown[]) => AsyncIterable<{ event: string; data: Record<string, unknown> }>) | undefined;
+  private _onCommand:       ((cmd: string) => void) | undefined;
+  private _isAuthenticated: boolean;
 
   constructor(
-    fileName:       string,
-    ext:            string,
-    isBinary:       boolean,
-    contentPromise: Promise<string>,
-    saveContent:    ((text: string) => Promise<void>) | null,
-    onAnalyze:      ((...args: unknown[]) => AsyncIterable<{ event: string; data: Record<string, unknown> }>) | undefined,
-    onCommand:      ((cmd: string) => void) | undefined,
+    fileName:        string,
+    ext:             string,
+    isBinary:        boolean,
+    contentPromise:  Promise<string>,
+    saveContent:     ((text: string) => Promise<void>) | null,
+    onAnalyze:       ((...args: unknown[]) => AsyncIterable<{ event: string; data: Record<string, unknown> }>) | undefined,
+    onCommand:       ((cmd: string) => void) | undefined,
+    isAuthenticated: boolean,
   ) {
     super();
-    this._fileName       = fileName;
-    this._ext            = ext;
-    this._isBinary       = isBinary;
-    this._contentPromise = contentPromise;
-    this._saveContent    = saveContent;
-    this._onAnalyze      = onAnalyze;
-    this._onCommand      = onCommand;
+    this._fileName        = fileName;
+    this._ext             = ext;
+    this._isBinary        = isBinary;
+    this._contentPromise  = contentPromise;
+    this._saveContent     = saveContent;
+    this._onAnalyze       = onAnalyze;
+    this._onCommand       = onCommand;
+    this._isAuthenticated = isAuthenticated;
     this.addClass('smarts-bio-panel');
   }
 
@@ -141,6 +210,7 @@ class LocalViewerWidget extends ReactWidget {
         saveContent={this._saveContent}
         onAnalyze={this._onAnalyze}
         onCommand={this._onCommand}
+        isAuthenticated={this._isAuthenticated}
       />
     );
   }
@@ -237,7 +307,7 @@ export class ViewerWidgetFactory extends ABCWidgetFactory<
       ? (cmd: string) => { if (cmd === 'sign-in') auth.signIn(); }
       : undefined;
 
-    const content = new LocalViewerWidget(fileName, ext, isBinary, contentPromise, saveContent, onAnalyze, onCommand);
+    const content = new LocalViewerWidget(fileName, ext, isBinary, contentPromise, saveContent, onAnalyze, onCommand, auth?.isAuthenticated ?? false);
 
     const widget = new DocumentWidget({ content, context });
     widget.title.label    = fileName;
