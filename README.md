@@ -1,6 +1,6 @@
 # AI Bioinformatics for JupyterLab ([smarts.bio](https://smarts.bio))
 
-**The bioinformatics AI agent that lives in your notebook.** Design proteins, run GPU pipelines, search every major database, and visualize results — without leaving JupyterLab.
+**The bioinformatics AI copilot that lives in your notebook.** Design proteins, run GPU pipelines (RFdiffusion, Boltz, GATK, DESeq2), search every major database (NCBI, UniProt, PDB, STRING), and open any bioinformatics file natively — FASTA, BAM, VCF, PDB, SDF, Newick, DICOM, and 80+ more — without leaving JupyterLab.
 
 ![smarts.bio in JupyterLab — 3D structure viewer and AI chat](https://smarts-public.s3.us-east-1.amazonaws.com/jupyterlab/screenshot-structure-chat.png)
 
@@ -21,6 +21,57 @@ Ask the agent anything in plain English and watch it work:
 The agent chooses tools, runs them, and streams the answer back in real time. Long-running GPU jobs (RFdiffusion, Boltz, GATK, etc.) are dispatched to the cloud and tracked in the Processes panel — you keep working while they run.
 
 **Jupyter advantage:** Insert any code block the agent writes directly as a new notebook cell with one click. Attach your active cell as context so the agent knows exactly what you're working on.
+
+---
+
+## Supported file formats
+
+smarts.bio registers as the native viewer for 80+ bioinformatics formats. Open any of these directly in JupyterLab — no conversion, no extra tools.
+
+| Category | Formats |
+|---|---|
+| **Sequence** | FASTA (`.fasta` `.fa` `.fna` `.faa` `.ffn` `.frn`), FASTQ (`.fastq` `.fq`) |
+| **GenBank** | `.gb` `.gbk` `.gbff` `.genbank` |
+| **Alignment** | BAM, SAM, CRAM (`.bam` `.sam` `.cram` `.bai`) |
+| **Variant** | VCF, BCF, BED (`.vcf` `.bcf` `.bed`) |
+| **Structure** | PDB, mmCIF (`.pdb` `.ent` `.cif` `.mmcif`) |
+| **Molecules** | SDF, MOL2, SMILES, InChI, XYZ (`.sdf` `.mol` `.mol2` `.smi` `.smiles` `.xyz` `.inchi`) |
+| **Phylogenetics** | Newick, Nexus (`.nwk` `.tree` `.phy` `.tre` `.newick`) |
+| **Gene Ontology** | GAF, GOA (`.gaf` `.goa`) |
+| **Tabular** | CSV, TSV, XLSX, XLS (`.csv` `.tsv` `.xlsx` `.xls`) |
+| **Medical imaging** | DICOM (`.dcm` `.dicom`) |
+| **Whole-slide imaging** | `.svs` `.ndpi` `.scn` `.mrxs` (Aperio, Hamamatsu, Leica, and more) |
+| **Notebooks** | Jupyter (`.ipynb`) |
+| **Documents** | PDF, DOCX, Markdown |
+| **Images** | PNG, JPG, SVG, TIFF, BMP, WebP, GIF |
+| **Archives** | `.gz` — any format above can be gzip-compressed |
+
+---
+
+## Supported tools & pipelines
+
+| Category | Tools |
+|---|---|
+| **Read alignment** | BWA, Bowtie2, HISAT2, STAR |
+| **Variant calling** | GATK (HaplotypeCaller, Mutect2), SAMtools, BCFtools |
+| **RNA-seq** | STAR, Salmon, StringTie, DESeq2, edgeR |
+| **Quality control** | FastQC, Trimmomatic, MultiQC |
+| **Protein design** | RFdiffusion, Boltz, ProteinMPNN, AlphaFold |
+| **Sequence search** | BLAST (blastn, blastp, blastx), HMMER |
+| **File processing** | SAMtools, format conversion (50+ format pairs) |
+| **Single-cell** | Seurat-compatible workflows, scRNA-seq pipelines |
+
+## Supported databases
+
+| Database | What you can query |
+|---|---|
+| **NCBI** | PubMed, GenBank, Gene, SRA, RefSeq, dbSNP, ClinVar |
+| **UniProt** | Protein sequences, function, PTMs, disease associations |
+| **PDB** | 3D structures, experimental metadata, ligands |
+| **STRING** | Protein–protein interactions, network analysis |
+| **KEGG** | Pathways, enzymes, compounds, diseases |
+| **Ensembl** | Gene models, cross-species annotation |
+| **Google Patents** | 87M+ patents from 17+ patent offices (IP & prior art) |
 
 ---
 
@@ -68,16 +119,21 @@ Click **Analyze with smarts.bio** on any structure in the Files panel to immedia
 
 ### Sequence & genomics viewers
 
-Open `.fasta`, `.fastq`, `.bam`, `.sam`, `.vcf`, `.bed`, `.csv`, and `.tsv` files natively in JupyterLab. smarts.bio registers as the default viewer for all standard bioinformatics formats, with custom icons in the JupyterLab file browser for every recognized type.
+Open FASTA, FASTQ, BAM, SAM, CRAM, VCF, BED, GenBank, PDB, SDF, Newick, DICOM, and 70+ other formats natively in JupyterLab. smarts.bio registers as the default viewer for all standard bioinformatics formats, with custom icons in the file browser for every recognized type — including gzip-compressed files.
 
 ![Colorized FASTQ sequence viewer with nucleotide and translation display](https://smarts-public.s3.us-east-1.amazonaws.com/jupyterlab/screenshot-sequence-viewer.png)
 
 ![BAM coverage viewer showing read depth across a genomic region](https://smarts-public.s3.us-east-1.amazonaws.com/jupyterlab/screenshot-bam-viewer.png)
 
 - **Sequence viewer** — Colorized nucleotide / amino acid display for FASTA and FASTQ, with linear and circular views, reverse strand, and translation tracks
-- **Alignment viewer** — BAM/SAM coverage histogram with per-base depth, mapped/unmapped read filtering, and region navigation
-- **Variant viewer** — VCF/BED annotation with clinical context
-- **Table viewer** — CSV/TSV with sortable columns — useful for reviewing DESeq2 output or BLAST hit tables
+- **Alignment viewer** — BAM/SAM/CRAM coverage histogram with per-base depth, mapped/unmapped read filtering, and region navigation
+- **Variant viewer** — VCF/BCF/BED annotation with clinical context
+- **Structure viewer** — Interactive Molstar 3D viewer for PDB and mmCIF files (see above)
+- **Molecule viewer** — SDF, MOL2, SMILES, InChI, XYZ small molecule rendering
+- **Phylogenetic tree viewer** — Newick, Nexus, and Phylip tree formats
+- **Medical imaging** — DICOM and whole-slide imaging formats (SVS, NDPI, SCN)
+- **GenBank viewer** — `.gb` / `.gbk` / `.gbff` flat file rendering
+- **Table viewer** — CSV/TSV/XLSX with sortable columns — useful for DESeq2 output, BLAST hit tables, and variant annotations
 
 ---
 

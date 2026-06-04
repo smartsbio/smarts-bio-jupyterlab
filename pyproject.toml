@@ -5,11 +5,32 @@ build-backend = "hatchling.build"
 [project]
 name = "smartsbio-jupyterlab"
 dynamic = ["version"]
-description = "smarts.bio bioinformatics AI agent — JupyterLab extension"
+description = "AI bioinformatics copilot for JupyterLab: FASTA/VCF/PDB viewers, GPU pipelines (RFdiffusion, Boltz, GATK, DESeq2), and NCBI/UniProt/PDB database search — directly in your notebook."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
-keywords = ["JupyterLab", "bioinformatics", "AI", "smarts.bio"]
+keywords = [
+    "bioinformatics",
+    "genomics",
+    "single-cell",
+    "scRNA-seq",
+    "DESeq2",
+    "FASTA",
+    "VCF",
+    "protein design",
+    "computational biology",
+    "AlphaFold",
+    "BLAST",
+    "sequence analysis",
+    "protein structure",
+    "NCBI",
+    "UniProt",
+    "GATK",
+    "RNA-seq",
+    "variant calling",
+    "pipeline",
+    "JupyterLab",
+]
 classifiers = [
     "Framework :: Jupyter",
     "Framework :: Jupyter :: JupyterLab",
@@ -19,6 +40,12 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
 ]
 dependencies = ["jupyter_server>=2.0.1,<3"]
 
