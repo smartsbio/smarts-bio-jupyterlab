@@ -7,6 +7,7 @@ import {
   StructureViewer,
   CsvViewer,
   MoleculeViewer,
+  StructuredViewer,
   DocumentViewer,
   PdfViewer,
   ImageViewer,
@@ -31,6 +32,7 @@ export const ALIGNMENT_EXTS = new Set(['.sam', '.bam']);
 export const VARIANT_EXTS   = new Set(['.vcf', '.bed']);
 export const CSV_EXTS       = new Set(['.csv', '.tsv', '.xlsx', '.xls']);
 export const MOLECULE_EXTS  = new Set(['.mol', '.sdf', '.mol2', '.xyz', '.smi', '.smiles', '.inchi']);
+export const STRUCTURED_EXTS = new Set(['.json', '.jsonc', '.jsonl', '.ndjson', '.geojson', '.xml', '.gpx', '.kml', '.rss', '.atom']);
 export const TREE_EXTS      = new Set(['.nwk', '.tree', '.phy', '.tre', '.newick']);
 export const DOCUMENT_EXTS  = new Set(['.md', '.docx']);
 export const PDF_EXTS       = new Set(['.pdf']);
@@ -75,6 +77,7 @@ export function extToViewerType(ext: string): string {
   if (VARIANT_EXTS.has(ext))    return 'variant';
   if (CSV_EXTS.has(ext))        return 'data';
   if (MOLECULE_EXTS.has(ext))   return 'molecule';
+  if (STRUCTURED_EXTS.has(ext)) return 'structured';
   if (TREE_EXTS.has(ext))       return 'tree';
   if (DOCUMENT_EXTS.has(ext))   return 'document';
   if (PDF_EXTS.has(ext))        return 'pdf';
@@ -102,6 +105,7 @@ export function renderViewer(
   if (VARIANT_EXTS.has(ext))     return <VariantViewer   {...shared} />;
   if (CSV_EXTS.has(ext))         return <CsvViewer       {...shared} />;
   if (MOLECULE_EXTS.has(ext))    return <MoleculeViewer  {...shared} />;
+  if (STRUCTURED_EXTS.has(ext))  return <StructuredViewer {...shared} />;
   if (TREE_EXTS.has(ext))        return <TreeViewer       {...shared} />;
   if (DOCUMENT_EXTS.has(ext))    return <DocumentViewer  {...shared} />;
   if (PDF_EXTS.has(ext))         return <PdfViewer       fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
