@@ -869,6 +869,56 @@ export class SmartsBioClient {
     return this.request<unknown>('GET', `/v1/graph/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
   }
 
+  /** Genes overlapping a locus (chromosome = bare/Ensembl naming, start/end 1-based). */
+  async getGraphGenes(chromosome: string, start: number, end: number): Promise<unknown> {
+    const qs = new URLSearchParams({ chromosome, start: String(start), end: String(end) });
+    return this.request<unknown>('GET', `/v1/graph/genes?${qs}`);
+  }
+
+  /** ClinVar/known variants overlapping a locus (same convention). */
+  async getGraphVariants(chromosome: string, start: number, end: number): Promise<unknown> {
+    const qs = new URLSearchParams({ chromosome, start: String(start), end: String(end) });
+    return this.request<unknown>('GET', `/v1/graph/variants?${qs}`);
+  }
+
+  /** Start a BAM/VCF index job. Returns a processId, or a quota refusal to surface. */
+  async startIndexJob(
+    workspaceId: string,
+    fileKey: string,
+    kind: 'bam' | 'vcf',
+  ): Promise<{ processId?: string; quota?: { message: string; suggestedPlan?: string } }> {
+    const token = await this.auth.getToken();
+    const res = await fetch(`${this.getApiBase()}/v1/files/index`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspace_id: workspaceId, fileKey, kind }),
+    });
+    if (!res.ok) {
+      const e = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        quotaCheck?: { upgradeRequired?: boolean; suggestedPlan?: string };
+      };
+      if (e.code === 'COMPUTE_QUOTA_EXCEEDED' || e.quotaCheck?.upgradeRequired) {
+        return { quota: { message: e.error ?? 'You’ve reached your compute quota.', suggestedPlan: e.quotaCheck?.suggestedPlan } };
+      }
+      throw new Error(e.error ?? `Could not start indexing (${res.status})`);
+    }
+    const d = (await res.json()) as { processId?: string };
+    return { processId: d.processId };
+  }
+
+  /** Poll an index job; returns a lowercased status string. */
+  async getIndexStatus(processId: string): Promise<string> {
+    const token = await this.auth.getToken();
+    const res = await fetch(`${this.getApiBase()}/v1/files/index/${encodeURIComponent(processId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return 'running';
+    const d = (await res.json()) as { status?: string };
+    return (d.status ?? 'unknown').toLowerCase();
+  }
+
   // ── WSI / Whole Slide Image ─────────────────────────────────────────────────
 
   /**

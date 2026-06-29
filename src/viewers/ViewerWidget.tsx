@@ -4,14 +4,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ReactWidget, MainAreaWidget } from '@jupyterlab/apputils';
 import { ViewerShell } from '@smartsbio/ui';
 import type { WsiMeta } from '@smartsbio/ui';
+import { GenomeBrowserTool } from '@smartsbio/ui/genome-browser';
 import { SmartsBioClient } from '../api/SmartsBioClient';
 import {
+  ALIGNMENT_EXTS,
+  VARIANT_EXTS,
   BINARY_EXTS,
   WSI_EXTS,
   detectIsDark,
   extToViewerType,
   renderViewer,
 } from './renderViewer';
+import { buildGenomeBrowserIo } from './genomeBrowserIo';
+import { openInGraph } from './graphExplorerBridge';
 
 // ── Loading / error pane ─────────────────────────────────────────────��─────────
 
@@ -244,6 +249,22 @@ function RemoteViewerPane({
     return client.streamAnalysis(fileKey, viewerType, workspaceId, parameters);
   }, [client, fileKey, viewerType, workspaceId]);
 
+  // The indexed Genome Browser as an optional view-mode tab for BAM/VCF — reads
+  // regions over HTTP Range; clicking a feature opens the Graph Explorer.
+  const genomeBrowserPanel = React.useMemo(() => {
+    if (!(ALIGNMENT_EXTS.has(effectiveExt) || VARIANT_EXTS.has(effectiveExt))) return undefined;
+    return (
+      <GenomeBrowserTool
+        io={buildGenomeBrowserIo(client, workspaceId)}
+        isDark={detectIsDark()}
+        workspaceId={workspaceId}
+        fileKey={fileKey}
+        label={fileName}
+        onOpenInGraph={openInGraph}
+      />
+    );
+  }, [effectiveExt, client, workspaceId, fileKey, fileName]);
+
   // WsiViewer calls onOpenFile(fileUrl) when mounted. We return the already-fetched
   // WsiMeta from wsiData to avoid a second API call. The meta includes the wsi_id
   // that WsiViewer uses together with tileServerUrl to construct tile URLs.
@@ -278,6 +299,7 @@ function RemoteViewerPane({
     workspaceId,
     isAuthenticated: true,
     onExportPdf: handleExportPdf,
+    genomeBrowserPanel,
   });
 }
 

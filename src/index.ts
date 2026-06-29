@@ -18,6 +18,8 @@ import { ChatWidget } from './widgets/ChatWidget';
 import { ExplorerWidget } from './widgets/ExplorerWidget';
 import { BioSearchWidget } from './widgets/BioSearchWidget';
 import { GraphExplorerWidget } from './widgets/GraphExplorerWidget';
+import { GenomeBrowserWidget } from './widgets/GenomeBrowserWidget';
+import { setOpenInGraphHandler } from './viewers/graphExplorerBridge';
 import { createJupyterCapabilities } from './capabilities';
 import { CellInserter } from './notebook/CellInserter';
 import { CellContextProvider } from './notebook/CellContextProvider';
@@ -27,7 +29,7 @@ import { ViewerWidgetFactory, LOCAL_BINARY_EXTS } from './viewers/ViewerWidgetFa
 import { openViewerWidget } from './viewers/ViewerWidget';
 import { Base64ModelFactory } from '@jupyterlab/docregistry';
 import { LabIcon } from '@jupyterlab/ui-components';
-import { smartsBioIcon, bioSearchIcon, graphExplorerIcon } from './icons';
+import { smartsBioIcon, bioSearchIcon, graphExplorerIcon, genomeBrowserIcon } from './icons';
 import {
   sequenceLabIcon,
   alignmentLabIcon,
@@ -158,6 +160,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     // Bio Search and Graph Explorer — open as main-area tabs on demand
     let bioSearchWidget: BioSearchWidget | null = null;
     let graphExplorerWidget: GraphExplorerWidget | null = null;
+    let genomeBrowserWidget: GenomeBrowserWidget | null = null;
 
     function getOrCreateBioSearch(initialQuery?: string): BioSearchWidget {
       if (!bioSearchWidget || bioSearchWidget.isDisposed) {
@@ -193,6 +196,15 @@ const plugin: JupyterFrontEndPlugin<void> = {
       }
       return graphExplorerWidget;
     }
+
+    // Let the genome browser (inside the viewer widget tree) open the Graph Explorer
+    // for a clicked gene/variant/connection.
+    setOpenInGraphHandler((entity) => {
+      const w = getOrCreateGraphExplorer(entity);
+      if (!w.isAttached) app.shell.add(w, 'main');
+      app.shell.activateById(w.id);
+      w.navigateTo(entity);
+    });
 
     // Chat in right sidebar; Explorer (Files + Processes) in left sidebar
     app.shell.add(chatWidget, 'right', { rank: 400 });
@@ -572,6 +584,22 @@ const plugin: JupyterFrontEndPlugin<void> = {
       },
     });
 
+    commands.addCommand('smarts-bio:open-genome-browser', {
+      label: 'Genome Browser',
+      caption: 'Explore the human genome — genes, knowledge graph, and ClinVar variants',
+      icon: genomeBrowserIcon,
+      execute: () => {
+        if (!genomeBrowserWidget || genomeBrowserWidget.isDisposed) {
+          genomeBrowserWidget = new GenomeBrowserWidget(client);
+          genomeBrowserWidget.id = 'smarts-bio-genomebrowser';
+          genomeBrowserWidget.title.label = 'Genome Browser';
+          genomeBrowserWidget.title.closable = true;
+        }
+        if (!genomeBrowserWidget.isAttached) app.shell.add(genomeBrowserWidget, 'main');
+        app.shell.activateById(genomeBrowserWidget.id);
+      },
+    });
+
     commands.addCommand('smarts-bio:explore-selection', {
       label: 'smarts.bio: Explore Selection in Graph Explorer',
       execute: () => {
@@ -631,6 +659,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
         rank: 2,
       });
       launcher.add({
+        command: 'smarts-bio:open-genome-browser',
+        category: 'smarts.bio',
+        rank: 3,
+      });
+      launcher.add({
         command: 'smarts-bio:open-chat',
         category: 'smarts.bio',
         rank: 0,
@@ -657,6 +690,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         'smarts-bio:search-selection',
         'smarts-bio:open-graph-explorer',
         'smarts-bio:explore-selection',
+        'smarts-bio:open-genome-browser',
       ].forEach(command => palette.addItem({ command, category }));
     }
 

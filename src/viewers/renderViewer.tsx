@@ -65,6 +65,8 @@ interface ViewerProps {
   tileServerUrl?: string;
   /** WsiViewer: presigned S3 URL for the WSI file — passed as fileUrl prop. */
   fileUrl?: string;
+  /** Alignment/Variant: node for the optional "Genome Browser" view-mode tab. */
+  genomeBrowserPanel?: React.ReactNode;
 }
 
 /** Map file extension to the viewerType expected by bio-analytics. */
@@ -92,7 +94,7 @@ export function renderViewer(
   fileName: string,
   ext: string,
   content: string | Uint8Array,
-  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, tileServerUrl, fileUrl }: ViewerProps = {},
+  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, tileServerUrl, fileUrl, genomeBrowserPanel }: ViewerProps = {},
 ): React.ReactElement {
   const isDark = detectIsDark();
   const shared = { fileContent: content, fileName, isDark, onSave, onDownload, onUpload, onAnalyze: onAnalyze as any };
@@ -101,8 +103,8 @@ export function renderViewer(
   if (GOA_EXTS.has(ext))         return <GoaViewer        {...shared} />;
   if (SEQUENCE_EXTS.has(ext))    return <SequenceViewer  {...shared} />;
   if (STRUCTURE_EXTS.has(ext))   return <StructureViewer {...shared} />;
-  if (ALIGNMENT_EXTS.has(ext))   return <AlignmentViewer {...shared} />;
-  if (VARIANT_EXTS.has(ext))     return <VariantViewer   {...shared} />;
+  if (ALIGNMENT_EXTS.has(ext))   return <AlignmentViewer {...shared} genomeBrowserPanel={genomeBrowserPanel} />;
+  if (VARIANT_EXTS.has(ext))     return <VariantViewer   {...shared} genomeBrowserPanel={genomeBrowserPanel} />;
   if (CSV_EXTS.has(ext))         return <CsvViewer       {...shared} />;
   if (MOLECULE_EXTS.has(ext))    return <MoleculeViewer  {...shared} />;
   if (STRUCTURED_EXTS.has(ext))  return <StructuredViewer {...shared} />;
