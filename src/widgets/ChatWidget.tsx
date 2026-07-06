@@ -91,6 +91,10 @@ export class ChatWidget extends ReactWidget {
 
         if (chunk.type === 'text') {
           this._dispatchRef.current?.({ type: 'STREAM_CHUNK', messageId, content: chunk.content ?? '' });
+        } else if (chunk.type === 'final') {
+          // Final decorated result — replace any streamed text (no double-append).
+          this._dispatchRef.current?.({ type: 'STREAM_END', messageId, content: chunk.content ?? '' });
+          break;
         } else if (chunk.type === 'tool_use') {
           this._dispatchRef.current?.({ type: 'TOOL_USE', toolName: chunk.toolName ?? '' });
         } else if (chunk.type === 'error') {
@@ -141,6 +145,10 @@ export class ChatWidget extends ReactWidget {
 
         if (chunk.type === 'text') {
           this._dispatchRef.current?.({ type: 'STREAM_CHUNK', messageId, content: chunk.content ?? '' });
+        } else if (chunk.type === 'final') {
+          // Final decorated result — replace any streamed text (no double-append).
+          this._dispatchRef.current?.({ type: 'STREAM_END', messageId, content: chunk.content ?? '' });
+          break;
         } else if (chunk.type === 'tool_use') {
           this._dispatchRef.current?.({ type: 'TOOL_USE', toolName: chunk.toolName ?? '' });
         } else if (chunk.type === 'error') {

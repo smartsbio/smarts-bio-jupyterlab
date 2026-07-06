@@ -5,6 +5,8 @@
 //   - `getApiBase()` replaced with injected `getConfig()` callback
 //   - `uploadFile()` accepts File/Blob instead of filesystem path
 import { AuthProvider } from '../auth/AuthProvider';
+// Shared agent SSE parsing (progressive report streaming detection lives here, once).
+import { parseAgentSseLine } from '@smartsbio/ui/agent-stream';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -21,7 +23,9 @@ export interface ContextAttachment {
 }
 
 export interface StreamChunk {
-  type: 'text' | 'tool_use' | 'tool_result' | 'done' | 'error';
+  // 'text' = incremental append (streamed report piece); 'final' = replace with the
+  // decorated final result (so streaming + final don't double up).
+  type: 'text' | 'tool_use' | 'tool_result' | 'done' | 'error' | 'final';
   content?: string;
   toolName?: string;
   error?: string;
@@ -933,32 +937,34 @@ export class SmartsBioClient {
 }
 
 function parseSseLine(line: string): StreamChunk | null {
-  if (!line.startsWith('data: ')) {
+  if (!line.startsWith('data:')) {
     return null;
   }
-
-  const dataStr = line.slice('data: '.length);
+  const dataStr = line.slice(line.indexOf(':') + 1).trim();
   if (dataStr === '[DONE]') {
     return { type: 'done' };
   }
 
-  try {
-    const data = JSON.parse(dataStr) as Record<string, unknown>;
-
-    if (data.status === 'complete' && typeof data.result === 'string') {
-      return { type: 'text', content: data.result };
-    }
-
-    if (data.status === 'error') {
-      return { type: 'error', error: (data.message as string) || 'An error occurred' };
-    }
-
-    if (typeof data.status === 'string') {
-      return { type: 'tool_use', toolName: data.status };
-    }
-
+  // Delegate detection to the shared module (progressive report chunks, status, final,
+  // error) and translate to this client's StreamChunk shape.
+  const evt = parseAgentSseLine(line);
+  if (!evt) {
     return null;
-  } catch {
-    return null;
+  }
+  switch (evt.kind) {
+    case 'reportChunk':
+      return { type: 'text', content: evt.text }; // incremental append
+    case 'status':
+      return { type: 'tool_use', toolName: evt.message };
+    case 'verify':
+      return evt.phase === 'verifying'
+        ? { type: 'tool_use', toolName: 'Verifying claims against sources…' }
+        : null;
+    case 'complete':
+      return { type: 'final', content: evt.result }; // replace with decorated result
+    case 'error':
+      return { type: 'error', error: evt.message };
+    default:
+      return null; // 'revised' — the final result carries the corrected text
   }
 }
