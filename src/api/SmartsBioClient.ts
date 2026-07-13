@@ -7,6 +7,13 @@
 import { AuthProvider } from '../auth/AuthProvider';
 // Shared agent SSE parsing (progressive report streaming detection lives here, once).
 import { parseAgentSseLine } from '@smartsbio/ui/agent-stream';
+import { VERSION } from '../version';
+
+// Identifies this surface to the API gateway, which uses it to attribute usage.
+// Without it, gateway traffic from here is indistinguishable from the CLI/SDK.
+// VERSION is generated from package.json at build time (scripts/sync-version.js) so the
+// reported version can't silently drift out of date on a release.
+const SMARTS_CLIENT_HEADER = `jupyterlab/${VERSION}`;
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -116,6 +123,7 @@ export class SmartsBioClient {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
+        'X-Smarts-Client': SMARTS_CLIENT_HEADER,
         'Content-Type': 'application/json',
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -155,6 +163,7 @@ export class SmartsBioClient {
       signal,
       headers: {
         Authorization: `Bearer ${token}`,
+        'X-Smarts-Client': SMARTS_CLIENT_HEADER,
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
@@ -242,6 +251,7 @@ export class SmartsBioClient {
       signal,
       headers: {
         Authorization: `Bearer ${token}`,
+        'X-Smarts-Client': SMARTS_CLIENT_HEADER,
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
@@ -447,7 +457,7 @@ export class SmartsBioClient {
 
     const response = await fetch(`${this.getApiBase()}/v1/files/upload`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Smarts-Client': SMARTS_CLIENT_HEADER },
       body: formData,
     });
 
@@ -513,7 +523,7 @@ export class SmartsBioClient {
     const token = await this.auth.getToken();
     const url = `${apiBaseUrl}/v1/files/content?workspace_id=${encodeURIComponent(workspaceId)}&key=${encodeURIComponent(fileKey)}`;
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Smarts-Client': SMARTS_CLIENT_HEADER },
     });
     if (!response.ok) {
       throw new Error(`Failed to fetch file: ${response.statusText}`);
@@ -644,7 +654,7 @@ export class SmartsBioClient {
 
     const res = await fetch(`${apiBaseUrl}/v1/files/upload`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Smarts-Client': SMARTS_CLIENT_HEADER },
       body: form,
     });
     if (!res.ok) {
@@ -672,6 +682,7 @@ export class SmartsBioClient {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
+        'X-Smarts-Client': SMARTS_CLIENT_HEADER,
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
@@ -745,6 +756,7 @@ export class SmartsBioClient {
         signal,
         headers: {
           Authorization: `Bearer ${token}`,
+          'X-Smarts-Client': SMARTS_CLIENT_HEADER,
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
         },
@@ -894,7 +906,7 @@ export class SmartsBioClient {
     const token = await this.auth.getToken();
     const res = await fetch(`${this.getApiBase()}/v1/files/index`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Smarts-Client': SMARTS_CLIENT_HEADER },
       body: JSON.stringify({ workspace_id: workspaceId, fileKey, kind }),
     });
     if (!res.ok) {
@@ -916,7 +928,7 @@ export class SmartsBioClient {
   async getIndexStatus(processId: string): Promise<string> {
     const token = await this.auth.getToken();
     const res = await fetch(`${this.getApiBase()}/v1/files/index/${encodeURIComponent(processId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Smarts-Client': SMARTS_CLIENT_HEADER },
     });
     if (!res.ok) return 'running';
     const d = (await res.json()) as { status?: string };
