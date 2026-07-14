@@ -117,6 +117,7 @@ export class SmartsBioClient {
     endpoint: string,
     body?: unknown,
     retried = false,
+    extraHeaders?: Record<string, string>,
   ): Promise<T> {
     const token = await this.auth.getToken();
     const response = await fetch(`${this.getApiBase()}${endpoint}`, {
@@ -125,6 +126,7 @@ export class SmartsBioClient {
         Authorization: `Bearer ${token}`,
         'X-Smarts-Client': SMARTS_CLIENT_HEADER,
         'Content-Type': 'application/json',
+        ...extraHeaders,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
@@ -132,7 +134,7 @@ export class SmartsBioClient {
     if (response.status === 401 && !retried) {
       const refreshed = await this.auth.handleUnauthorized();
       if (refreshed) {
-        return this.request<T>(method, endpoint, body, true);
+        return this.request<T>(method, endpoint, body, true, extraHeaders);
       }
       throw new Error('Authentication required. Please sign in to smarts.bio.');
     }
@@ -333,10 +335,14 @@ export class SmartsBioClient {
     return this.request('GET', '/v1/user/profile');
   }
 
-  async getJobs(workspaceId: string): Promise<Job[]> {
+  async getJobs(workspaceId: string, auto = false): Promise<Job[]> {
     const result = await this.request<{ processes?: any[]; data?: any[] } | any[]>(
       'GET',
       `/v1/pipelines?workspace_id=${encodeURIComponent(workspaceId)}`,
+      undefined, false,
+      // Background polls declare themselves so gateway analytics can exclude them
+      // from active-user metrics (they'd otherwise count idle editors as activity).
+      auto ? { 'X-Smarts-Auto': 'true' } : undefined,
     );
     const raw: any[] = Array.isArray(result)
       ? result

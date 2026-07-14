@@ -184,7 +184,9 @@ export function createJupyterCapabilities(
     },
 
     // ── Processes panel ───────────────────────────────────────────────────────
-    getJobs: (workspaceId) => client.getJobs(workspaceId),
+    // `auto` marks background poll refreshes (sent as X-Smarts-Auto). Typed explicitly so this
+    // compiles against @smartsbio/ui versions from before the parameter existed.
+    getJobs: (workspaceId: string, auto?: boolean) => client.getJobs(workspaceId, auto),
 
     cancelJob: (jobId, workspaceId) => client.cancelJob(jobId, workspaceId),
 
