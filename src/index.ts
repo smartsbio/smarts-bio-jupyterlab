@@ -150,6 +150,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       },
       refreshFiles: () => explorerWidget.refresh(),
     });
+    chatWidget.openFile = (fileKey, fileName) => capabilities.onOpenViewer?.(fileKey, fileName, '.json');
 
     const explorerWidget = new ExplorerWidget(auth, workspaceSelector, capabilities);
     explorerWidget.id = 'smarts-bio-explorer';

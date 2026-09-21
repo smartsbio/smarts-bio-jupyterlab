@@ -190,6 +190,9 @@ export function createJupyterCapabilities(
 
     cancelJob: (jobId, workspaceId) => client.cancelJob(jobId, workspaceId),
 
+    // "Save as pipeline" on a finished pipeline run in the Processes panel.
+    savePipelineSpec: (workspaceId, runId, options) => client.savePipelineSpec(workspaceId, runId, options),
+
     // ── Platform actions ──────────────────────────────────────────────────────
     onSignIn: () => { void auth.signIn(); },
 

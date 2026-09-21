@@ -7,6 +7,7 @@
 import { AuthProvider } from '../auth/AuthProvider';
 // Shared agent SSE parsing (progressive report streaming detection lives here, once).
 import { parseAgentSseLine } from '@smartsbio/ui/agent-stream';
+import { savedPipelineSlashItems, isPipelineRun, SAVED_PIPELINES_FOLDER } from '@smartsbio/ui/pipelines';
 import { VERSION } from '../version';
 
 // Identifies this surface to the API gateway, which uses it to attribute usage.
@@ -48,6 +49,8 @@ export interface Job {
   durationMs?: number;
   errorMessage?: string;
   executionMode?: 'distributed' | 'external' | 'local';
+  /** A multi-step pipeline run; only these can be saved as a reusable pipeline. */
+  isPipeline?: boolean;
 }
 
 export interface WorkspaceInfo {
@@ -82,6 +85,10 @@ export interface CatalogPipeline {
   name: string;
   description: string;
   category: string;
+  /** Set for a pipeline saved in the workspace: its workspace path. */
+  specPath?: string;
+  /** Storage key of a saved pipeline, used to open it in the viewer. */
+  specKey?: string;
 }
 
 export interface WorkspaceFileItem {
@@ -365,6 +372,8 @@ export class SmartsBioClient {
         durationMs,
         errorMessage: typeof p.error === 'string' ? p.error : (p.error?.message ?? p.errorMessage),
         executionMode: p.executionMode,
+        // Only pipeline runs can be saved as a reusable pipeline.
+        isPipeline: isPipelineRun(p),
       };
     });
   }
@@ -374,6 +383,47 @@ export class SmartsBioClient {
       'DELETE',
       `/v1/pipelines/${jobId}?workspace_id=${encodeURIComponent(workspaceId)}`,
     );
+  }
+
+  /** Start a pipeline run from a spec saved in the workspace. */
+  async runPipelineSpec(
+    workspaceId: string,
+    source: { specFile: string },
+    input: Record<string, unknown>,
+  ): Promise<{ runId?: string }> {
+    const result = await this.request<Record<string, any>>('POST', '/v1/pipelines', {
+      workspace_id: workspaceId,
+      spec_file: source.specFile,
+      input,
+    });
+    return { runId: result?.processId ?? result?.executionId };
+  }
+
+  /**
+   * Save a finished pipeline run as a reusable spec under pipelines/specs/.
+   * Rejects when a spec of that name exists and `overwrite` isn't set.
+   */
+  async savePipelineSpec(
+    workspaceId: string,
+    runId: string,
+    options: { name?: string; overwrite?: boolean } = {},
+  ): Promise<{ path: string; fileKey?: string; warnings?: string[] }> {
+    const result = await this.request<Record<string, any>>(
+      'POST',
+      `/v1/pipelines/${encodeURIComponent(runId)}/save-spec`,
+      { workspace_id: workspaceId, name: options.name, overwrite: options.overwrite === true },
+    );
+    return { path: result.path, fileKey: result.s3Key, warnings: result.warnings };
+  }
+
+  /** Pipelines the user has saved in a workspace, as slash-menu entries. */
+  async getSavedPipelines(workspaceId: string): Promise<CatalogPipeline[]> {
+    try {
+      return savedPipelineSlashItems(await this.getFiles(workspaceId, SAVED_PIPELINES_FOLDER));
+    } catch {
+      // A workspace that has never saved a pipeline has no such folder.
+      return [];
+    }
   }
 
   async getFiles(workspaceId: string, folderPath?: string): Promise<WorkspaceFileItem[]> {

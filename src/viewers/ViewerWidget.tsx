@@ -14,7 +14,9 @@ import {
   detectIsDark,
   extToViewerType,
   renderViewer,
+  PIPELINE_EXT,
 } from './renderViewer';
+import { isPipelineSpecFileName, looksLikePipelineSpec, workspaceRelativePath } from '@smartsbio/ui';
 import { buildGenomeBrowserIo } from './genomeBrowserIo';
 import { openInGraph } from './graphExplorerBridge';
 
@@ -126,6 +128,12 @@ function RemoteViewerPane({
               client.updateFileMetadata(workspaceId, fileKey, { format: 'vega-lite' }).catch(() => { /* best-effort */ });
             }
           } catch { /* not valid JSON */ }
+
+          // A pipeline spec: by its .pipeline.json name, or by content for a
+          // spec saved under some other name.
+          if (isPipelineSpecFileName(fileName) || looksLikePipelineSpec(fileName, raw)) {
+            setEffectiveExt(PIPELINE_EXT);
+          }
         }
         setContent(raw);
       }
@@ -300,6 +308,10 @@ function RemoteViewerPane({
     isAuthenticated: true,
     onExportPdf: handleExportPdf,
     genomeBrowserPanel,
+    // Pipeline specs run from their workspace path.
+    specPath: workspaceRelativePath(fileKey),
+    onRunPipeline: (_specPath, input) =>
+      client.runPipelineSpec(workspaceId, { specFile: workspaceRelativePath(fileKey) }, input),
   });
 }
 

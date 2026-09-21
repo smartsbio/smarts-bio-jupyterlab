@@ -38,6 +38,9 @@ export class ChatWidget extends ReactWidget {
     if (auth.isAuthenticated) void this._handleFetchSlashCatalog();
   }
 
+  /** Opens a workspace file in a viewer tab; set by the plugin once the shell is ready. */
+  openFile?: (fileKey: string, fileName: string) => void;
+
   /** Attach context (called from CellContextProvider or file context menu). */
   attachContext(context: ContextAttachment): void {
     this._context = context;
@@ -211,10 +214,16 @@ export class ChatWidget extends ReactWidget {
 
   private async _handleFetchSlashCatalog(): Promise<void> {
     try {
-      const catalog = await this.client.getCatalog();
+      const workspaceId = this._getWorkspaceId();
+      const [catalog, saved] = await Promise.all([
+        this.client.getCatalog(),
+        workspaceId ? this.client.getSavedPipelines(workspaceId) : Promise.resolve([]),
+      ]);
       const items: SlashItem[] = [
         ...catalog.tools.map((t: any) => ({ ...t, type: 'tool' as const })),
         ...catalog.pipelines.map((p: any) => ({ ...p, type: 'pipeline' as const })),
+        // "Your pipelines": saved specs open in the viewer rather than being inserted as /id.
+        ...saved.map((p: any) => ({ ...p, type: 'pipeline' as const })),
       ];
       this._slashCatalog = items;
       this._dispatchRef.current?.({ type: 'SET_SLASH_CATALOG', items });
@@ -254,6 +263,9 @@ export class ChatWidget extends ReactWidget {
         onFetchFiles={(path) => { void this._handleFetchFiles(path); }}
         onConfirmScript={(threadId) => { void this._handleConfirmScript(threadId); }}
         onDownloadChat={(messages) => this._handleDownloadChat(messages)}
+        onOpenSavedPipeline={(item) => {
+          if (item.specKey) this.openFile?.(item.specKey, item.specKey.split('/').pop() || item.name);
+        }}
         insertLabel="Insert ↓"
       />
     );

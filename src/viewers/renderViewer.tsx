@@ -8,6 +8,7 @@ import {
   CsvViewer,
   MoleculeViewer,
   StructuredViewer,
+  PipelineViewer,
   DocumentViewer,
   PdfViewer,
   ImageViewer,
@@ -67,7 +68,17 @@ interface ViewerProps {
   fileUrl?: string;
   /** Alignment/Variant: node for the optional "Genome Browser" view-mode tab. */
   genomeBrowserPanel?: React.ReactNode;
+  /** PipelineViewer: workspace-relative path of the spec being shown. */
+  specPath?: string;
+  /** PipelineViewer: start a run of this spec. Absent → the viewer is read-only. */
+  onRunPipeline?: (specPath: string, input: Record<string, string>) => Promise<{ runId?: string }>;
 }
+
+/**
+ * Pseudo-extension the caller passes for a pipeline spec — detected by its
+ * `.pipeline.json` name or by content — mirroring how `.chart` marks Vega-Lite.
+ */
+export const PIPELINE_EXT = '.pipeline';
 
 /** Map file extension to the viewerType expected by bio-analytics. */
 export function extToViewerType(ext: string): string {
@@ -86,6 +97,7 @@ export function extToViewerType(ext: string): string {
   if (IMAGE_EXTS.has(ext))      return 'image';
   if (WSI_EXTS.has(ext))        return 'wsi';
   if (DICOM_EXTS.has(ext))      return 'dicom';
+  if (ext === PIPELINE_EXT)     return 'structured';
   return 'text';
 }
 
@@ -94,10 +106,25 @@ export function renderViewer(
   fileName: string,
   ext: string,
   content: string | Uint8Array,
-  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, tileServerUrl, fileUrl, genomeBrowserPanel }: ViewerProps = {},
+  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, tileServerUrl, fileUrl, genomeBrowserPanel, specPath, onRunPipeline }: ViewerProps = {},
 ): React.ReactElement {
   const isDark = detectIsDark();
   const shared = { fileContent: content, fileName, isDark, onSave, onDownload, onUpload, onAnalyze: onAnalyze as any };
+
+  if (ext === PIPELINE_EXT) {
+    return (
+      <PipelineViewer
+        fileContent={content}
+        fileName={fileName}
+        isDark={isDark}
+        workspaceId={workspaceId}
+        specPath={specPath}
+        onSave={onSave}
+        onDownload={onDownload}
+        onRun={onRunPipeline}
+      />
+    );
+  }
 
   if (GENBANK_EXTS.has(ext))     return <GenBankViewer   {...shared} />;
   if (GOA_EXTS.has(ext))         return <GoaViewer        {...shared} />;
