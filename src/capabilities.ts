@@ -6,6 +6,7 @@ import { SmartsBioClient } from './api/SmartsBioClient';
 import { AuthProvider } from './auth/AuthProvider';
 import { CellInserter } from './notebook/CellInserter';
 import { InputDialog, showDialog, Dialog, Notification } from '@jupyterlab/apputils';
+import type { IStateDB } from '@jupyterlab/statedb';
 import { Widget } from '@lumino/widgets';
 
 /**
@@ -37,8 +38,22 @@ export function createJupyterCapabilities(
   auth: AuthProvider,
   cellInserter: CellInserter,
   callbacks: JupyterCallbacks,
+  stateDB: IStateDB,
 ): SmartsBioCapabilities {
   return {
+    // ── Preferences ───────────────────────────────────────────────────────────
+    // IStateDB is a hard `requires` of the plugin, so it is always available.
+    // No sync-access cache is needed here (unlike WorkspaceSelector): the shared
+    // UI's onboarding hook is async by construction.
+    getPreference: async (key) => {
+      const value = await stateDB.fetch(key);
+      return typeof value === 'string' ? value : null;
+    },
+
+    setPreference: async (key, value) => {
+      await stateDB.save(key, value);
+    },
+
     // ── Chat ──────────────────────────────────────────────────────────────────
     sendMessage: async (text, conversationId, workspaceId, context, dispatch, signal, _mode) => {
       const messageId = crypto.randomUUID();

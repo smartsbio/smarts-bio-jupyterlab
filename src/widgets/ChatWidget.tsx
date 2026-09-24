@@ -3,8 +3,8 @@
 // No postMessage bridge needed — JupyterLab panels run in the same DOM.
 import React from 'react';
 import { ReactWidget } from '@jupyterlab/apputils';
-import { ChatApp, ChatAction } from '@smartsbio/ui';
-import type { ChatMessage, ContextAttachment, SlashItem } from '@smartsbio/ui';
+import { ChatApp, ChatAction, SmartsBioProvider } from '@smartsbio/ui';
+import type { ChatMessage, ContextAttachment, SlashItem, SmartsBioCapabilities } from '@smartsbio/ui';
 import { AuthProvider } from '../auth/AuthProvider';
 import { SmartsBioClient } from '../api/SmartsBioClient';
 import { WorkspaceSelector } from '../workspace/WorkspaceSelector';
@@ -16,6 +16,7 @@ export class ChatWidget extends ReactWidget {
   private _context: ContextAttachment | undefined;
   private _dispatchRef = { current: null as React.Dispatch<ChatAction> | null };
   private _slashCatalog: SlashItem[] | null = null;
+  private _capabilities: SmartsBioCapabilities | undefined;
 
   constructor(
     private readonly auth: AuthProvider,
@@ -233,9 +234,41 @@ export class ChatWidget extends ReactWidget {
     }
   }
 
+  /**
+   * Capabilities are built after the widget is constructed (they close over it),
+   * so they arrive via this setter. Mirrors how `openFile` is assigned in
+   * index.ts one line later. Until it is called, render() returns a bare
+   * ChatApp — safe, because the shared UI's onboarding hook reads the context
+   * directly and degrades rather than throwing when there is no provider.
+   */
+  setCapabilities(capabilities: SmartsBioCapabilities): void {
+    this._capabilities = capabilities;
+    this.update();
+  }
+
   protected render(): React.ReactElement {
+    const chat = this._renderChat();
+    if (!this._capabilities) return chat;
+    // Every other @smartsbio/ui surface in this extension gets the provider
+    // (see ExplorerWidget); ChatWidget was the outlier. Wrapping it lets
+    // context-driven features — starting with onboarding — reach chat.
+    return (
+      <SmartsBioProvider
+        value={{
+          capabilities: this._capabilities,
+          workspaceId: this.workspaceSelector.selectedWorkspaceId ?? '',
+          profile: this.auth.profile,
+        }}
+      >
+        {chat}
+      </SmartsBioProvider>
+    );
+  }
+
+  private _renderChat(): React.ReactElement {
     return (
       <ChatApp
+        host="jupyterlab"
         profile={this.auth.profile}
         sendOnEnter={true}
         slashCatalog={this._slashCatalog}

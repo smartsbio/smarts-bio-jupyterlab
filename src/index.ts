@@ -2,7 +2,13 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin,
 } from '@jupyterlab/application';
-import { ICommandPalette } from '@jupyterlab/apputils';
+import { ICommandPalette, Notification } from '@jupyterlab/apputils';
+import {
+  ONBOARDING_PREFERENCE_KEY,
+  ONBOARDING_CHANGED_EVENT,
+  parseOnboardingState,
+  serializeOnboardingState,
+} from '@smartsbio/ui';
 import { ILauncher } from '@jupyterlab/launcher';
 import { Widget } from '@lumino/widgets';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
@@ -149,8 +155,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
         void app.commands.execute('smarts-bio:open-chat');
       },
       refreshFiles: () => explorerWidget.refresh(),
-    });
+    }, stateDB);
     chatWidget.openFile = (fileKey, fileName) => capabilities.onOpenViewer?.(fileKey, fileName, '.json');
+    chatWidget.setCapabilities(capabilities);
 
     const explorerWidget = new ExplorerWidget(auth, workspaceSelector, capabilities);
     explorerWidget.id = 'smarts-bio-explorer';
@@ -215,8 +222,33 @@ const plugin: JupyterFrontEndPlugin<void> = {
     auth.onAuthChange((profile) => {
       if (profile) {
         app.shell.activateById(chatWidget.id);
+        void showLayoutOrientation();
       }
     });
+
+    /**
+     * One-time orientation. The checklist in chat teaches what you can DO; it
+     * assumes you can already find the Files panel. In JupyterLab chat is in the
+     * right sidebar and Files in the left, and nothing says so.
+     *
+     * A notification rather than a bespoke overlay: it is one sentence, and the
+     * launcher cards already do most of the discovery work.
+     */
+    async function showLayoutOrientation(): Promise<void> {
+      const key = 'smarts-bio:layoutOrientationShown';
+      if (await stateDB.fetch(key)) return;
+      await stateDB.save(key, true);
+      Notification.info(
+        'smarts.bio: chat is here in the right sidebar. Your files and running processes are in the left sidebar.',
+        {
+          autoClose: 12000,
+          actions: [{
+            label: 'Show Files',
+            callback: () => { app.shell.activateById(explorerWidget.id); },
+          }],
+        },
+      );
+    }
 
     // ── Status bar ────────────────────────────────────────────────────────────
     if (statusBar) {
@@ -349,6 +381,24 @@ const plugin: JupyterFrontEndPlugin<void> = {
       icon: smartsBioIcon,
       execute: () => {
         app.shell.activateById(chatWidget.id);
+      },
+    });
+
+    commands.addCommand('smarts-bio:getting-started', {
+      label: 'smarts.bio: Getting Started',
+      caption: 'Show the getting-started checklist again',
+      icon: smartsBioIcon,
+      execute: async () => {
+        // Clear `dismissed` in the shared store, then nudge the mounted
+        // checklist to re-read it — the card lives inside ChatWidget's React
+        // tree, which this command is outside of.
+        const raw = await stateDB.fetch(ONBOARDING_PREFERENCE_KEY);
+        const next = parseOnboardingState(typeof raw === 'string' ? raw : null);
+        next.dismissed = false;
+        next.startedAt = next.startedAt ?? Date.now();
+        await stateDB.save(ONBOARDING_PREFERENCE_KEY, serializeOnboardingState(next));
+        app.shell.activateById(chatWidget.id);
+        window.dispatchEvent(new Event(ONBOARDING_CHANGED_EVENT));
       },
     });
 
@@ -669,6 +719,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
         category: 'smarts.bio',
         rank: 0,
       });
+      launcher.add({
+        command: 'smarts-bio:getting-started',
+        category: 'smarts.bio',
+        rank: 4,
+      });
     }
 
     // ── Command palette entries ───────────────────────────────────────────────
@@ -692,6 +747,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         'smarts-bio:open-graph-explorer',
         'smarts-bio:explore-selection',
         'smarts-bio:open-genome-browser',
+        'smarts-bio:getting-started',
       ].forEach(command => palette.addItem({ command, category }));
     }
 
