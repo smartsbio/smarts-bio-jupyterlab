@@ -48,6 +48,11 @@ export class AuthProvider {
     return this._profile !== null;
   }
 
+  /** Web app base URL, for flows that link out of JupyterLab (e.g. plan upgrade). */
+  get websiteBaseUrl(): string {
+    return this.getConfig().websiteBaseUrl;
+  }
+
   get profile(): UserProfile | null {
     return this._profile;
   }

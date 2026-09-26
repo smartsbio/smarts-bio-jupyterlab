@@ -54,6 +54,14 @@ export function createJupyterCapabilities(
       await stateDB.save(key, value);
     },
 
+    // Reuses the web app's pricing-intent flow, which opens Manage
+    // Organization → Plans for an org admin and tells everyone else to ask
+    // theirs. Not the backend's `upgradeUrl` (/billing/upgrade) — no such route.
+    onUpgradePlan: (suggestedPlan?: string) => {
+      const plan = encodeURIComponent(suggestedPlan || 'pro');
+      window.open(`${auth.websiteBaseUrl}/?from=pricing&plan=${plan}`, '_blank', 'noopener');
+    },
+
     // ── Chat ──────────────────────────────────────────────────────────────────
     sendMessage: async (text, conversationId, workspaceId, context, dispatch, signal, _mode) => {
       const messageId = crypto.randomUUID();

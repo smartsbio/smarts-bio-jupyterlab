@@ -8,6 +8,7 @@ import { AuthProvider } from '../auth/AuthProvider';
 // Shared agent SSE parsing (progressive report streaming detection lives here, once).
 import { parseAgentSseLine } from '@smartsbio/ui/agent-stream';
 import { savedPipelineSlashItems, isPipelineRun, SAVED_PIPELINES_FOLDER } from '@smartsbio/ui/pipelines';
+import { uploadFailureError } from '@smartsbio/ui/upload';
 import { VERSION } from '../version';
 
 // Identifies this surface to the API gateway, which uses it to attribute usage.
@@ -148,6 +149,12 @@ export class SmartsBioClient {
 
     if (!response.ok) {
       const text = await response.text().catch(() => response.statusText);
+      // A 429 here is the storage-quota wall (it also guards the presigned-URL
+      // step used for large uploads), so carry the parsed message and code
+      // rather than burying them in "API error 429: {...}".
+      if (response.status === 429) {
+        throw uploadFailureError(response.status, text);
+      }
       throw new Error(`smarts.bio API error ${response.status}: ${text}`);
     }
 
@@ -518,7 +525,10 @@ export class SmartsBioClient {
     });
 
     if (!response.ok) {
-      throw new Error(`File upload failed: ${response.statusText}`);
+      // Reporting only statusText turned an over-quota upload into
+      // "File upload failed: Too Many Requests", losing both the reason and
+      // the QUOTA_EXCEEDED code the Files panel branches on.
+      throw uploadFailureError(response.status, await response.text().catch(() => ''));
     }
 
     return response.json() as Promise<UploadedFile>;
