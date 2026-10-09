@@ -432,6 +432,17 @@ const plugin: JupyterFrontEndPlugin<void> = {
       },
     });
 
+    // Email notifications are account state on the server, so they are
+    // deliberately not in the JupyterLab settings editor: that registry is
+    // per-install, and a local copy would drift from what the server does.
+    commands.addCommand('smarts-bio:email-preferences', {
+      label: 'smarts.bio: Email Notification Settings',
+      execute: () => {
+        const base = auth.websiteBaseUrl.replace(/\/$/, '');
+        window.open(`${base}/?view=settings`, '_blank', 'noopener');
+      },
+    });
+
     // Workspace
     commands.addCommand('smarts-bio:select-workspace', {
       label: 'smarts.bio: Select Workspace',
@@ -737,6 +748,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         'smarts-bio:open-explorer',
         'smarts-bio:open-processes',
         'smarts-bio:open-settings',
+        'smarts-bio:email-preferences',
         'smarts-bio:select-workspace',
         'smarts-bio:upload-file',
         'smarts-bio:refresh-files',
