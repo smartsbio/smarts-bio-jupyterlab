@@ -1012,6 +1012,52 @@ export class SmartsBioClient {
   async wsiOpen(fileKey: string, workspaceId: string): Promise<Record<string, unknown>> {
     return this.request<Record<string, unknown>>('POST', '/v1/analytics/wsi/open', { fileKey, workspaceId });
   }
+
+  /**
+   * Open a .h5ad and return metadata plus the first embedding inline.
+   * The gateway presigns fileKey+workspaceId and forwards to bio-analytics
+   * /sc/open, which reads the file over HTTP Range requests — a .h5ad is
+   * routinely multi-GB and is never downloaded.
+   */
+  async scOpen(fileKey: string, workspaceId: string, colorBy?: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      'POST', '/v1/analytics/sc/open', { fileKey, workspaceId, color_by: colorBy });
+  }
+
+  /**
+   * One vector from a .h5ad.
+   *
+   * Embeddings and expression come back as raw Float32 bytes, so this cannot
+   * go through `request()` — that helper always calls response.json(). A
+   * 100k-cell vector is 400 KB as bytes versus ~2.5 MB of JSON text plus the
+   * parse, which is the whole reason the endpoint returns binary.
+   */
+  async scVector(
+    fileKey: string,
+    workspaceId: string,
+    kind: 'embedding' | 'obs' | 'expression',
+    key: string,
+  ): Promise<Float32Array | Record<string, unknown>> {
+    const token = await this.auth.getToken();
+    const response = await fetch(`${this.getApiBase()}/v1/analytics/sc/vector`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-Smarts-Client': SMARTS_CLIENT_HEADER,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ fileKey, workspaceId, kind, key }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({})) as { message?: string };
+      throw new Error(err.message ?? `Could not load ${kind} '${key}'`);
+    }
+    const ct = response.headers.get('content-type') ?? '';
+    if (ct.includes('application/octet-stream')) {
+      return new Float32Array(await response.arrayBuffer());
+    }
+    return response.json() as Promise<Record<string, unknown>>;
+  }
 }
 
 function parseSseLine(line: string): StreamChunk | null {

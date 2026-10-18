@@ -10,6 +10,7 @@ import {
   ALIGNMENT_EXTS,
   VARIANT_EXTS,
   BINARY_EXTS,
+  SINGLECELL_EXTS,
   WSI_EXTS,
   detectIsDark,
   extToViewerType,
@@ -280,7 +281,31 @@ function RemoteViewerPane({
     return wsiData!.meta;
   }, [wsiData]);
 
+  // SingleCellViewer: like WSI, the file is never downloaded. These go through
+  // the gateway, which presigns the key and forwards to bio-analytics /sc/*.
+  // Unlike WSI there is nothing to pre-fetch — /sc/open is cheap and the viewer
+  // calls it itself on mount — so there is no equivalent of wsiData here.
+  const onScOpen = useCallback(
+    (_fileUrl: string, colorBy?: string) => client.scOpen(fileKey, workspaceId, colorBy),
+    [client, fileKey, workspaceId]);
+
+  const onScVector = useCallback(
+    (_fileUrl: string, kind: 'embedding' | 'obs' | 'expression', key: string) =>
+      client.scVector(fileKey, workspaceId, kind, key),
+    [client, fileKey, workspaceId]);
+
   if (error)            return <ViewerShell error={error} isDark={isDark} />;
+
+  // Single-cell: no content download and no pre-fetch — the viewer calls
+  // /sc/open itself. fileUrl is unused by the callbacks (they pass fileKey to
+  // the gateway) but the viewer needs a non-empty value to begin loading.
+  if (SINGLECELL_EXTS.has(ext)) {
+    return renderViewer(fileName, ext, '', {
+      fileUrl: fileKey,
+      onScOpen,
+      onScVector,
+    });
+  }
 
   // WSI: wait for both presigned URL and wsiOpen to resolve before rendering.
   if (WSI_EXTS.has(ext)) {

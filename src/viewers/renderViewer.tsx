@@ -18,6 +18,7 @@ import {
   TreeViewer,
   GenBankViewer,
   GoaViewer,
+  SingleCellViewer,
   WsiViewer,
   SmartsBioProvider,
   ViewerShell,
@@ -41,6 +42,7 @@ export const IMAGE_EXTS     = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp',
 /** Formats that have no viewer — too binary/compressed to display meaningfully. */
 export const BINARY_EXTS    = new Set(['.cram', '.bcf', '.bw', '.bigwig']);
 /** Whole Slide Images — tile-server required, never downloaded directly. */
+export const SINGLECELL_EXTS = new Set(['.h5ad']);
 export const WSI_EXTS       = new Set(['.svs', '.ndpi', '.scn', '.mrxs', '.vms', '.vmu', '.bif']);
 /** DICOM medical imaging files — fetched as binary and rendered by DicomViewer. */
 export const DICOM_EXTS     = new Set(['.dcm', '.dicom']);
@@ -60,6 +62,11 @@ interface ViewerProps {
   workspaceId?: string;
   isAuthenticated?: boolean;
   onExportPdf?: (markdown: string, title: string) => Promise<void>;
+  /** SingleCellViewer: POST /sc/open via the host, returns metadata + first embedding. */
+  onScOpen?: (fileUrl: string, colorBy?: string) => Promise<any>;
+  /** SingleCellViewer: POST /sc/vector via the host. Float32Array for embeddings
+   *  and expression; a JSON object for obs columns. */
+  onScVector?: (fileUrl: string, kind: 'embedding' | 'obs' | 'expression', key: string) => Promise<any>;
   /** WsiViewer: called with the presigned file URL; returns WsiMeta from bio-analytics. */
   onOpenFile?: (fileUrl: string) => Promise<WsiMeta>;
   /** WsiViewer: direct URL of the bio-analytics tile server (no auth needed for tiles). */
@@ -95,6 +102,7 @@ export function extToViewerType(ext: string): string {
   if (DOCUMENT_EXTS.has(ext))   return 'document';
   if (PDF_EXTS.has(ext))        return 'pdf';
   if (IMAGE_EXTS.has(ext))      return 'image';
+  if (SINGLECELL_EXTS.has(ext)) return 'singlecell';
   if (WSI_EXTS.has(ext))        return 'wsi';
   if (DICOM_EXTS.has(ext))      return 'dicom';
   if (ext === PIPELINE_EXT)     return 'structured';
@@ -106,7 +114,7 @@ export function renderViewer(
   fileName: string,
   ext: string,
   content: string | Uint8Array,
-  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, tileServerUrl, fileUrl, genomeBrowserPanel, specPath, onRunPipeline }: ViewerProps = {},
+  { onSave, onDownload, onUpload, onAnalyze, onResolveRef, onListFiles, makeFileUrl, workspaceId, isAuthenticated, onExportPdf, onOpenFile, onScOpen, onScVector, tileServerUrl, fileUrl, genomeBrowserPanel, specPath, onRunPipeline }: ViewerProps = {},
 ): React.ReactElement {
   const isDark = detectIsDark();
   const shared = { fileContent: content, fileName, isDark, onSave, onDownload, onUpload, onAnalyze: onAnalyze as any };
@@ -140,6 +148,22 @@ export function renderViewer(
   if (PDF_EXTS.has(ext))         return <PdfViewer       fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
   if (IMAGE_EXTS.has(ext))       return <ImageViewer     fileContent={content} fileName={fileName} isDark={isDark} onDownload={onDownload} onUpload={onUpload} onAnalyze={onAnalyze as any} />;
   if (DICOM_EXTS.has(ext))       return <DicomViewer     fileContent={content as Uint8Array} fileName={fileName} isDark={isDark} onDownload={onDownload} />;
+
+  // Single-cell .h5ad: like WSI, never uses file content. bio-analytics reads
+  // coordinates and colour vectors out of S3 over HTTP Range requests, so the
+  // file (routinely multi-GB) is never downloaded into the browser. Without a
+  // workspace there is no presigned URL, and the viewer shows its error state.
+  if (SINGLECELL_EXTS.has(ext)) {
+    return (
+      <SingleCellViewer
+        fileUrl={fileUrl ?? ''}
+        fileName={fileName}
+        isDark={isDark}
+        onOpenFile={onScOpen ?? (async () => { throw new Error('Single-cell viewing requires a smarts.bio workspace.'); })}
+        onFetchVector={onScVector ?? (async () => { throw new Error('Single-cell viewing requires a smarts.bio workspace.'); })}
+      />
+    );
+  }
 
   // WSI: tile-server based viewer — never uses file content, needs presigned URL + tile server.
   // When opened from a workspace, fileUrl is the presigned S3 URL and onOpenFile calls bio-analytics
