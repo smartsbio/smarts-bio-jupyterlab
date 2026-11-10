@@ -9,6 +9,7 @@ import { AuthProvider } from '../auth/AuthProvider';
 import { parseAgentSseLine } from '@smartsbio/ui/agent-stream';
 import { savedPipelineSlashItems, isPipelineRun, SAVED_PIPELINES_FOLDER } from '@smartsbio/ui/pipelines';
 import { uploadFailureError } from '@smartsbio/ui/upload';
+import { jobDetailsFromRecord, type JobDetails } from '@smartsbio/ui';
 import { VERSION } from '../version';
 
 // Identifies this surface to the API gateway, which uses it to attribute usage.
@@ -52,6 +53,12 @@ export interface Job {
   executionMode?: 'distributed' | 'external' | 'local';
   /** A multi-step pipeline run; only these can be saved as a reusable pipeline. */
   isPipeline?: boolean;
+  /** Shared by a pipeline run and its steps, so the panel can nest them. */
+  pipelineExecutionId?: string;
+  stepNumber?: number;
+  totalSteps?: number;
+  /** The run's request id; process details are keyed by it. */
+  requestId?: string;
 }
 
 export interface WorkspaceInfo {
@@ -381,8 +388,33 @@ export class SmartsBioClient {
         executionMode: p.executionMode,
         // Only pipeline runs can be saved as a reusable pipeline.
         isPipeline: isPipelineRun(p),
+        // Lets the Processes panel nest a pipeline's steps under it. Older
+        // servers omit these and the panel lists everything flat.
+        pipelineExecutionId: p.pipelineExecutionId,
+        stepNumber: p.stepNumber,
+        totalSteps: p.totalSteps,
+        // `id` is process-manager's execution id; details are keyed by this one.
+        requestId: p.processRequestId,
       };
     });
+  }
+
+  /** Parameters, files, results and logs of one run, for a Processes panel row's details. */
+  async getJobDetails(job: Job, workspaceId: string): Promise<JobDetails> {
+    const record = await this.request<Record<string, unknown>>(
+      'GET',
+      `/v1/pipelines/${encodeURIComponent(job.requestId ?? job.id)}/details?workspace_id=${encodeURIComponent(workspaceId)}`,
+    );
+    return jobDetailsFromRecord(record);
+  }
+
+  /** Start a run again with the same tool or pipeline and inputs. */
+  async rerunJob(job: Job, workspaceId: string): Promise<{ processId?: string }> {
+    return this.request<{ processId?: string }>(
+      'POST',
+      `/v1/pipelines/${encodeURIComponent(job.requestId ?? job.id)}/rerun`,
+      { workspace_id: workspaceId },
+    );
   }
 
   async cancelJob(jobId: string, workspaceId: string): Promise<void> {

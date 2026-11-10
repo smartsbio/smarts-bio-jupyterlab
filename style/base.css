@@ -107,6 +107,16 @@
 /* Animated cursor for streaming messages */
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+/* Used by @smartsbio/ui's Processes panel — mirrors its base.css. */
+@keyframes sb-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes sb-breathe {
+  0%, 100% { border-color: rgba(77, 163, 255, 0.35); box-shadow: 0 0 0 0 rgba(77, 163, 255, 0); }
+  50%      { border-color: rgba(77, 163, 255, 0.9);  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.18); }
+}
+.sb-breathing { animation: sb-breathe 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .sb-breathing { animation: none; }
+}
 
 /* Allow the context menu (position:fixed) to escape the explorer panel.
    FilesPanel renders the menu with position:fixed but JupyterLab's overflow:hidden

@@ -213,6 +213,9 @@ export function createJupyterCapabilities(
 
     cancelJob: (jobId, workspaceId) => client.cancelJob(jobId, workspaceId),
 
+    getJobDetails: (job, workspaceId) => client.getJobDetails(job, workspaceId),
+    rerunJob: (job, workspaceId) => client.rerunJob(job, workspaceId),
+
     // "Save as pipeline" on a finished pipeline run in the Processes panel.
     savePipelineSpec: (workspaceId, runId, options) => client.savePipelineSpec(workspaceId, runId, options),
 
