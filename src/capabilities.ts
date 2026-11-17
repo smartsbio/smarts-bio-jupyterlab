@@ -31,6 +31,8 @@ export interface JupyterCallbacks {
   openViewer(fileKey: string, fileName: string, ext: string): void;
   analyzeFile(fileKey: string, fileName: string): void;
   refreshFiles(): void;
+  /** The workspace currently selected in the sidebar ('' before sign-in). */
+  selectedWorkspaceId(): string;
 }
 
 export function createJupyterCapabilities(
@@ -236,7 +238,8 @@ export function createJupyterCapabilities(
       }).then(r => r.button.accept),
 
     onMoveFile: async (fileKey, fileName) => {
-      const workspaceId = auth.profile?.defaultWorkspaceId ?? '';
+      // The workspace the user selected, not the account default.
+      const workspaceId = callbacks.selectedWorkspaceId() || auth.profile?.defaultWorkspaceId || '';
       if (!workspaceId) return;
 
       const pathStack: string[] = [];
@@ -302,7 +305,8 @@ export function createJupyterCapabilities(
     },
 
     onNewFileRequest: async (folderPath) => {
-      const workspaceId = auth.profile?.defaultWorkspaceId ?? '';
+      // The workspace the user selected, not the account default.
+      const workspaceId = callbacks.selectedWorkspaceId() || auth.profile?.defaultWorkspaceId || '';
       if (!workspaceId) return;
 
       const FILE_TYPES: { label: string; ext: string; template: string; fileFormat?: string }[] = [

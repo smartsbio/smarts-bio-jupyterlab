@@ -6,11 +6,21 @@
 import { IStateDB } from '@jupyterlab/statedb';
 import { SmartsBioClient, OrgWithWorkspaces } from '../api/SmartsBioClient';
 import { AuthProvider } from '../auth/AuthProvider';
+import { openWorkspaceManagement } from './accountPages';
 
 const SELECTED_ORG_KEY       = 'smarts-bio:selectedOrgId';
 const SELECTED_WORKSPACE_KEY = 'smarts-bio:selectedWorkspaceId';
 const SELECTED_ORG_NAME_KEY  = 'smarts-bio:selectedOrgName';
 const SELECTED_WS_NAME_KEY   = 'smarts-bio:selectedWorkspaceName';
+const SELECTED_USER_KEY      = 'smarts-bio:selectedUserId';
+
+interface SavedSelection {
+  userId: string;
+  orgId: string;
+  workspaceId: string;
+  workspaceName: string;
+  orgName: string;
+}
 
 type WorkspaceChangeListener = (workspaceId: string, workspaceName: string, orgName: string) => void;
 
@@ -27,6 +37,8 @@ export class WorkspaceSelector implements Disposable {
   private _workspaceId   = '';
   private _workspaceName = '';
   private _orgName       = '';
+  private _userId        = '';
+  private _saved?: Promise<SavedSelection | null>;
 
   constructor(
     private readonly stateDB: IStateDB,
@@ -54,6 +66,15 @@ export class WorkspaceSelector implements Disposable {
     return this._orgName;
   }
 
+  /**
+   * The caller's role in the selected workspace's org ('admin' | 'billing' |
+   * 'user'), or null when unknown (list not loaded, or an older gateway).
+   */
+  get selectedOrgRole(): string | null {
+    const org = this._orgs.find(o => o.workspaces.some(w => w.workspaceId === this._workspaceId));
+    return typeof org?.role === 'string' ? org.role : null;
+  }
+
   onWorkspaceChange(listener: WorkspaceChangeListener): Disposable {
     this._listeners.push(listener);
     return {
@@ -63,20 +84,55 @@ export class WorkspaceSelector implements Disposable {
     };
   }
 
-  /** Restore cached selection from IStateDB on startup. */
-  async restore(): Promise<void> {
-    try {
-      const wsId   = (await this.stateDB.fetch(SELECTED_WORKSPACE_KEY)) as string | null;
-      const wsName = (await this.stateDB.fetch(SELECTED_WS_NAME_KEY))   as string | null;
-      const oName  = (await this.stateDB.fetch(SELECTED_ORG_NAME_KEY))  as string | null;
-      if (wsId) {
-        this._workspaceId   = wsId;
-        this._workspaceName = wsName ?? '';
-        this._orgName       = oName  ?? '';
-        this._notify();
+  /**
+   * Read the saved selection from IStateDB once. Both `restore()` and
+   * `_initFromProfile()` await this same promise, so the profile-driven init can
+   * no longer race ahead of the stateDB read and overwrite the saved choice
+   * with the account default.
+   */
+  private _loadSaved(): Promise<SavedSelection | null> {
+    this._saved ??= (async () => {
+      try {
+        const [userId, orgId, workspaceId, workspaceName, orgName] = await Promise.all([
+          this.stateDB.fetch(SELECTED_USER_KEY),
+          this.stateDB.fetch(SELECTED_ORG_KEY),
+          this.stateDB.fetch(SELECTED_WORKSPACE_KEY),
+          this.stateDB.fetch(SELECTED_WS_NAME_KEY),
+          this.stateDB.fetch(SELECTED_ORG_NAME_KEY),
+        ]);
+        if (typeof workspaceId !== 'string' && typeof orgId !== 'string') return null;
+        const str = (v: unknown) => (typeof v === 'string' ? v : '');
+        return {
+          userId: str(userId),
+          orgId: str(orgId),
+          workspaceId: str(workspaceId),
+          workspaceName: str(workspaceName),
+          orgName: str(orgName),
+        };
+      } catch {
+        return null;
       }
-    } catch {
-      // Silently ignore if state not available yet
+    })();
+    return this._saved;
+  }
+
+  /** Saved values from before the userId was stored count as this user's. */
+  private _savedFor(saved: SavedSelection | null, userId: string | undefined): SavedSelection | null {
+    if (!saved) return null;
+    return !saved.userId || saved.userId === userId ? saved : null;
+  }
+
+  /**
+   * Show the cached selection on startup (names only, so the status bar is not
+   * blank while the org list loads). `_initFromProfile` validates it.
+   */
+  async restore(): Promise<void> {
+    const saved = this._savedFor(await this._loadSaved(), this.auth.profile?.userId);
+    if (saved?.workspaceId && !this._workspaceId) {
+      this._workspaceId   = saved.workspaceId;
+      this._workspaceName = saved.workspaceName;
+      this._orgName       = saved.orgName;
+      this._notify();
     }
   }
 
@@ -181,9 +237,29 @@ export class WorkspaceSelector implements Disposable {
         list.appendChild(row);
       });
 
+      // ── Footer: manage ──────────────────────────────────────────────────────
+      // The picker is where people look when they want to add someone to a
+      // workspace; members/invites live on the website.
+      const footer = document.createElement('button');
+      footer.style.cssText = [
+        `display:flex;align-items:center;gap:8px;width:100%;border:none;border-top:1px solid ${border}`,
+        `background:transparent;cursor:pointer;text-align:left;padding:10px 16px;font-size:12px;color:${accent}`,
+        'font-family:inherit',
+      ].join(';');
+      footer.textContent = 'Manage workspaces… (members & settings)';
+      footer.title = 'Opens in a new browser tab';
+      footer.addEventListener('mouseenter', () => { footer.style.background = bgHover; });
+      footer.addEventListener('mouseleave', () => { footer.style.background = 'transparent'; });
+      footer.addEventListener('click', () => {
+        cleanup();
+        resolve(null);
+        openWorkspaceManagement(this.auth.websiteBaseUrl, this._workspaceId);
+      });
+
       // ── Assemble ────────────────────────────────────────────────────────────
       card.appendChild(header);
       card.appendChild(list);
+      card.appendChild(footer);
       backdrop.appendChild(card);
       document.body.appendChild(backdrop);
 
@@ -220,7 +296,15 @@ export class WorkspaceSelector implements Disposable {
     });
   }
 
-  private async _initFromProfile(profile: { defaultWorkspaceId: string }): Promise<void> {
+  /**
+   * Pick the workspace for this user, in order: the one selected this session
+   * (survives the periodic profile refresh) → the saved one → the account
+   * default → the first workspace of the saved org → the first workspace.
+   * Every id is checked against the live org list first.
+   */
+  private async _initFromProfile(profile: { userId: string; defaultWorkspaceId: string }): Promise<void> {
+    this._userId = profile.userId;
+    const saved = this._savedFor(await this._loadSaved(), profile.userId);
     try {
       this._orgs = await this.client.getOrganizationsWithWorkspaces();
     } catch {
@@ -228,14 +312,22 @@ export class WorkspaceSelector implements Disposable {
       return;
     }
 
-    const savedId = this._workspaceId || profile.defaultWorkspaceId;
-
-    for (const org of this._orgs) {
-      const ws = org.workspaces.find(w => w.workspaceId === savedId);
-      if (ws) {
-        await this._select(org, ws.workspaceId, ws.name);
-        return;
+    for (const id of [this._workspaceId, saved?.workspaceId, profile.defaultWorkspaceId]) {
+      if (!id) continue;
+      for (const org of this._orgs) {
+        const ws = org.workspaces.find(w => w.workspaceId === id);
+        if (ws) {
+          await this._select(org, ws.workspaceId, ws.name);
+          return;
+        }
       }
+    }
+
+    // The saved workspace is gone but the user is still in that org.
+    const savedOrg = this._orgs.find(o => o.organizationId === saved?.orgId && o.workspaces.length > 0);
+    if (savedOrg) {
+      await this._select(savedOrg, savedOrg.workspaces[0].workspaceId, savedOrg.workspaces[0].name);
+      return;
     }
 
     // Fallback: first available workspace
@@ -254,6 +346,14 @@ export class WorkspaceSelector implements Disposable {
     this._workspaceId   = workspaceId;
     this._workspaceName = workspaceName;
     this._orgName       = org.name;
+    this._saved = Promise.resolve({
+      userId: this._userId,
+      orgId: org.organizationId,
+      workspaceId,
+      workspaceName,
+      orgName: org.name,
+    });
+    await this.stateDB.save(SELECTED_USER_KEY,      this._userId);
     await this.stateDB.save(SELECTED_ORG_KEY,       org.organizationId);
     await this.stateDB.save(SELECTED_ORG_NAME_KEY,  org.name);
     await this.stateDB.save(SELECTED_WORKSPACE_KEY, workspaceId);
@@ -262,9 +362,12 @@ export class WorkspaceSelector implements Disposable {
   }
 
   private _clear(): void {
+    // Sign-out. The saved selection stays (it carries the userId, so another
+    // account ignores it), and the same user gets it back on next sign-in.
     this._workspaceId   = '';
     this._workspaceName = '';
     this._orgName       = '';
+    this._userId        = '';
     this._orgs = [];
     this._notify();
   }

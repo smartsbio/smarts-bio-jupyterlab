@@ -71,6 +71,8 @@ export interface OrgWithWorkspaces {
   name: string;
   type: string;
   plan: string;
+  /** Caller's org role; absent from older gateways, null when unknown. */
+  role?: string | null;
   workspaces: WorkspaceInfo[];
 }
 

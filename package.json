@@ -1,6 +1,6 @@
 {
   "name": "@smartsbio/jupyterlab-extension",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "description": "smarts.bio AI-powered bioinformatics directly in JupyterLab",
   "keywords": [
     "jupyter",

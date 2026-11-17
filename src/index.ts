@@ -20,6 +20,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import { OAuthCallback } from './auth/OAuthCallback';
 import { SmartsBioClient } from './api/SmartsBioClient';
 import { WorkspaceSelector } from './workspace/WorkspaceSelector';
+import { openAccountPage, openWorkspaceManagement } from './workspace/accountPages';
 import { ChatWidget } from './widgets/ChatWidget';
 import { ExplorerWidget } from './widgets/ExplorerWidget';
 import { BioSearchWidget } from './widgets/BioSearchWidget';
@@ -156,6 +157,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         void app.commands.execute('smarts-bio:open-chat');
       },
       refreshFiles: () => explorerWidget.refresh(),
+      selectedWorkspaceId: () => workspaceSelector.selectedWorkspaceId,
     }, stateDB);
     chatWidget.openFile = (fileKey, fileName) => capabilities.onOpenViewer?.(fileKey, fileName, '.json');
     chatWidget.setCapabilities(capabilities);
@@ -449,6 +451,34 @@ const plugin: JupyterFrontEndPlugin<void> = {
     commands.addCommand('smarts-bio:select-workspace', {
       label: 'smarts.bio: Select Workspace',
       execute: () => workspaceSelector.pick(),
+    });
+
+    // Members, invites and roles live on the website; open the current
+    // workspace's page there. For everyone, not just org admins.
+    commands.addCommand('smarts-bio:manage-workspace', {
+      label: 'smarts.bio: Manage Workspace (members & settings)',
+      execute: () => openWorkspaceManagement(auth.websiteBaseUrl, workspaceSelector.selectedWorkspaceId),
+    });
+
+    // Org page for admins; Plans & Billing for admins and the billing role —
+    // the website's rule for its tabs. Unknown role keeps them visible.
+    const orgRole = () => workspaceSelector.selectedOrgRole;
+    commands.addCommand('smarts-bio:manage-organization', {
+      label: 'smarts.bio: Manage Organization',
+      isVisible: () => orgRole() === null || orgRole() === 'admin',
+      execute: () => openAccountPage(auth.websiteBaseUrl, '/organization'),
+    });
+
+    commands.addCommand('smarts-bio:open-billing', {
+      label: 'smarts.bio: Plans & Billing',
+      isVisible: () => orgRole() === null || orgRole() === 'admin' || orgRole() === 'billing',
+      execute: () => openAccountPage(auth.websiteBaseUrl, '/organization?tab=subscription'),
+    });
+
+    // Re-evaluate isVisible when the workspace (and so the org) changes.
+    workspaceSelector.onWorkspaceChange(() => {
+      commands.notifyCommandChanged('smarts-bio:manage-organization');
+      commands.notifyCommandChanged('smarts-bio:open-billing');
     });
 
     // File operations
@@ -752,6 +782,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
         'smarts-bio:open-settings',
         'smarts-bio:email-preferences',
         'smarts-bio:select-workspace',
+        'smarts-bio:manage-organization',
+        'smarts-bio:manage-workspace',
+        'smarts-bio:open-billing',
         'smarts-bio:upload-file',
         'smarts-bio:refresh-files',
         'smarts-bio:analyze-cell',
